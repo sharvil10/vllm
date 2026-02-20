@@ -1,3 +1,8 @@
 steps:
-  - label: "Hello world"
-    command: echo "Hello world"
+  - label: "Intel GPU Test"
+    depends_on: []
+    soft_fail: true
+    agents:
+     queue: "intel-xpu-kubevirt"
+    commands: 
+    - echo "Running Intel GPU tests..."
