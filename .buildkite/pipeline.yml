@@ -6,3 +6,14 @@ steps:
      queue: "intel-xpu-kubevirt"
     commands: 
     - echo "Running Intel GPU tests..."
+    - docker images
+    plugins:
+      - kubernetes:
+          sidecars:
+          - image: docker:dind
+            command: [dockerd-entrypoint.sh]
+            securityContext:
+              privileged: true
+            env:
+              - name: DOCKER_TLS_CERTDIR
+                value: ""
