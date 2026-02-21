@@ -9,7 +9,7 @@ steps:
     - docker images
     env:
       DOCKER_HOST: tcp://localhost:2375
-    image: docker:29.2.1-alpine3.23
+    image: docker:29.2-cli
     plugins:
       - kubernetes:
           sidecars:
