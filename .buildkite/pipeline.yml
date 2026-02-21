@@ -7,6 +7,8 @@ steps:
     commands: 
     - echo "Running Intel GPU tests..."
     - docker images
+    env:
+      DOCKER_HOST: tcp://localhost:2375
     plugins:
       - kubernetes:
           sidecars:
