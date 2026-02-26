@@ -11,6 +11,14 @@ steps:
     image: docker:29.2-cli
     plugins:
       - kubernetes:
+          podSpecPatch:
+            containers:
+            - name: container-0    # <-- Specify this exactly as `container-0`.
+              resources:           #     Currently under experimentation to make this more ergonomic.
+                requests:
+                  "gpu.intel.com/i915": "2"
+                limits:
+                  "gpu.intel.com/i915": "2"
           sidecars:
           - image: docker:dind
             command:
