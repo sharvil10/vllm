@@ -13,9 +13,28 @@ steps:
       - kubernetes:
           sidecars:
           - image: docker:dind
-            command: [dockerd-entrypoint.sh]
+            command:
+            - sh
+            - -c
+            - |
+              mkdir -p /etc/docker
+              cat > /etc/docker/daemon.json <<EOF
+              {
+                "ipv6": false,
+                "storage-driver": "overlay2"
+              }
+              EOF
+              dockerd-entrypoint.sh
             securityContext:
               privileged: true
             env:
               - name: DOCKER_TLS_CERTDIR
                 value: ""
+            readinessProbe:
+              exec:
+                command:
+                - docker
+                - info
+              initialDelaySeconds: 5
+              periodSeconds: 5
+              failureThreshold: 10
