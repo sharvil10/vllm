@@ -5,8 +5,7 @@ steps:
     agents:
      queue: "intel-xpu-kubevirt"
     commands: 
-    - echo "Running Intel GPU tests..."
-    - docker images
+    - sh .buildkite/scripts/hardware_ci/run-xpu-test.sh
     env:
       DOCKER_HOST: tcp://localhost:2375
     image: docker:29.2-cli
