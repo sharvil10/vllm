@@ -20,7 +20,7 @@ if [ -z "$REGISTRY_TOKEN" ]; then
 fi
 
 COMM="a1c86a2ff56ac0f041579e184cb8530c8879f6a7"
-image_name="quay.io/repository/sharvilshah-1/vllm-ci:${COMM}"
+image_name="${REGISTRY}/${REGISTRY_USER}/vllm-ci:${COMM}"
 container_name="xpu_${COMM}_$(tr -dc A-Za-z0-9 < /dev/urandom | head -c 10; echo)"
 
 docker login ${REGISTRY} -u ${REGISTRY_USER} -p ${REGISTRY_TOKEN}
