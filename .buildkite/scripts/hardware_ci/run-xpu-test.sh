@@ -6,9 +6,11 @@ set -ex
 
 image_name="xpu/vllm-ci:${BUILDKITE_COMMIT}"
 container_name="xpu_${BUILDKITE_COMMIT}_$(tr -dc A-Za-z0-9 < /dev/urandom | head -c 10; echo)"
-
+docker login ${REGISTRY} -u buildkite -p $BUILDKITE_AGENT_TOKEN
+docker pull ${REGISTRY}/ubuntu:22.04
+exit 1
 # Try building the docker image
-docker build -t "${image_name}" -f docker/Dockerfile.xpu .
+#docker build -t "${image_name}" -f docker/Dockerfile.xpu .
 
 # Setup cleanup
 remove_docker_container() {

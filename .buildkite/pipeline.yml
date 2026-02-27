@@ -9,6 +9,9 @@ steps:
     env:
       DOCKER_HOST: tcp://localhost:2375
     image: docker:29.2-cli
+    secrets:
+      - REGISTRY
+      - BUILDKITE_AGENT_TOKEN
     plugins:
       - kubernetes:
           podSpecPatch:
