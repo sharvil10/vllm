@@ -11,7 +11,6 @@ steps:
     image: docker:29.2-cli
     secrets:
       - REGISTRY
-      - BUILDKITE_AGENT_TOKEN
     plugins:
       - kubernetes:
           podSpecPatch:

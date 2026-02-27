@@ -6,6 +6,17 @@ set -ex
 
 image_name="xpu/vllm-ci:${BUILDKITE_COMMIT}"
 container_name="xpu_${BUILDKITE_COMMIT}_$(tr -dc A-Za-z0-9 < /dev/urandom | head -c 10; echo)"
+
+if [ -z "$REGISTRY" ]; then
+    echo "REGISTRY is not set. Please set it to run the tests."
+    exit 1
+fi
+
+if [ -z "$BUILDKITE_AGENT_TOKEN" ]; then
+    echo "BUILDKITE_AGENT_TOKEN is not set. Please set it to run the tests."
+    exit 1
+fi
+
 docker login ${REGISTRY} -u buildkite -p $BUILDKITE_AGENT_TOKEN
 docker pull ${REGISTRY}/ubuntu:22.04
 exit 1
