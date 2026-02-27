@@ -11,7 +11,8 @@ steps:
     image: docker:29.2-cli
     secrets:
       - REGISTRY
-      - TOKEN
+      - REGISTRY_TOKEN
+      - REGISTRY_USER
     plugins:
       - kubernetes:
           podSpecPatch:

@@ -9,19 +9,25 @@ if [ -z "$REGISTRY" ]; then
     exit 1
 fi
 
-if [ -z "$TOKEN" ]; then
-    echo "TOKEN is not set. Please set it to run the tests."
+if [ -z "$REGISTRY_USER" ]; then
+    echo "REGISTRY_USER is not set. Please set it to run the tests."
     exit 1
 fi
 
-image_name="${REGISTRY}/vllm-ci:${BUILDKITE_COMMIT}"
-container_name="xpu_${BUILDKITE_COMMIT}_$(tr -dc A-Za-z0-9 < /dev/urandom | head -c 10; echo)"
+if [ -z "$REGISTRY_TOKEN" ]; then
+    echo "REGISTRY_TOKEN is not set. Please set it to run the tests."
+    exit 1
+fi
 
-docker login ${REGISTRY} -u buildkite -p $TOKEN
+COMM="a1c86a2ff56ac0f041579e184cb8530c8879f6a7"
+image_name="${REGISTRY}/vllm-ci:${COMM}"
+container_name="xpu_${COMM}_$(tr -dc A-Za-z0-9 < /dev/urandom | head -c 10; echo)"
+
+#docker login ${REGISTRY} -u ${REGISTRY_USER} -p ${REGISTRY_TOKEN}
 
 # Try building the docker image
-docker build -t "${image_name}" -f docker/Dockerfile.xpu .
-docker push "${image_name}"
+#docker build -t "${image_name}" -f docker/Dockerfile.xpu .
+#docker push "${image_name}"
 
 # Setup cleanup
 remove_docker_container() {
