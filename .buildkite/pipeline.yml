@@ -25,6 +25,17 @@ steps:
                   memory: "16Gi"
                 limits:
                   "gpu.intel.com/i915": "2"
+                volumeMounts:
+                  - name: dockerconfigjson
+                    mountPath: /root/.docker # Path inside the container
+                    readOnly: true
+            volumes:
+              - name: dockerconfigjson
+                secret:
+                  secretName: sharvilshah-1-pull-secret # Name of your Kubernetes secret
+                  items:
+                    - key: .dockerconfigjson
+                      path: config.json # Path inside the volume
           sidecars:
           - image: docker:dind
             command:
