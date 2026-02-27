@@ -20,6 +20,8 @@ steps:
               resources:           #     Currently under experimentation to make this more ergonomic.
                 requests:
                   "gpu.intel.com/i915": "2"
+                  cpu: "32"
+                  memory: "16Gi"
                 limits:
                   "gpu.intel.com/i915": "2"
           sidecars:
