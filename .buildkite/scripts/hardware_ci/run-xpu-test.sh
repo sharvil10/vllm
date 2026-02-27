@@ -14,7 +14,7 @@ if [ -z "$TOKEN" ]; then
     exit 1
 fi
 
-image_name="${REGISTRY}/xpu/vllm-ci:${BUILDKITE_COMMIT}"
+image_name="${REGISTRY}/vllm-ci:${BUILDKITE_COMMIT}"
 container_name="xpu_${BUILDKITE_COMMIT}_$(tr -dc A-Za-z0-9 < /dev/urandom | head -c 10; echo)"
 
 docker login ${REGISTRY} -u buildkite -p $TOKEN
