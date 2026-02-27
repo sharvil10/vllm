@@ -12,12 +12,12 @@ if [ -z "$REGISTRY" ]; then
     exit 1
 fi
 
-if [ -z "$BUILDKITE_AGENT_TOKEN" ]; then
-    echo "BUILDKITE_AGENT_TOKEN is not set. Please set it to run the tests."
+if [ -z "$TOKEN" ]; then
+    echo "TOKEN is not set. Please set it to run the tests."
     exit 1
 fi
 
-docker login ${REGISTRY} -u buildkite -p $BUILDKITE_AGENT_TOKEN
+docker login ${REGISTRY} -u buildkite -p $TOKEN
 docker pull ${REGISTRY}/ubuntu:22.04
 exit 1
 # Try building the docker image
