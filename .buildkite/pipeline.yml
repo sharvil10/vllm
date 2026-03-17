@@ -20,19 +20,13 @@ steps:
                   cpu: "8"
                   memory: "16Gi"
 
-  - wait
-
-  - label: "Intel GPU Test"
+  - label: "Offline Inference - Basic"
     depends_on: "build-container"
     soft_fail: true
     agents:
-     queue: "intel-xpu-kubevirt"
-    commands: 
-    - sh .buildkite/scripts/hardware_ci/run-xpu-test.sh
-    env:
-      DOCKER_HOST: tcp://localhost:2375
-      #REGISTRY_USER: ${REGISTRY_USER}
-      #REGISTRY: ${REGISTRY}
+      queue: "intel-xpu-kubevirt"
+    commands:
+      - sh .buildkite/scripts/hardware_ci/run-xpu-test.sh offline-basic
     secrets:
       - REGISTRY_TOKEN
       - HF_TOKEN
@@ -45,8 +39,8 @@ steps:
               - name: sharvilshah-1-pull-secret
             containers:
             - name: container-0
-              image: quay.io/sharvilshah-1/vllm-ci:${BUILDKITE_COMMIT}   # built by build-container step
-              resources:           #     Currently under experimentation to make this more ergonomic.
+              image: quay.io/sharvilshah-1/vllm-ci:${BUILDKITE_COMMIT}
+              resources:
                 requests:
                   "gpu.intel.com/i915": "2"
                   cpu: "32"
@@ -57,5 +51,164 @@ steps:
               volumeMounts:
               - mountPath: /buildkite/workspace
                 name: workspace
-              #command: [""]
+
+  - label: "Offline Inference - Distributed"
+    depends_on: "build-container"
+    soft_fail: true
+    agents:
+      queue: "intel-xpu-kubevirt"
+    commands:
+      - sh .buildkite/scripts/hardware_ci/run-xpu-test.sh offline-distributed
+    secrets:
+      - REGISTRY_TOKEN
+      - HF_TOKEN
+      - REGISTRY_USER
+      - REGISTRY
+    plugins:
+      - kubernetes:
+          podSpecPatch:
+            imagePullSecrets:
+              - name: sharvilshah-1-pull-secret
+            containers:
+            - name: container-0
+              image: quay.io/sharvilshah-1/vllm-ci:${BUILDKITE_COMMIT}
+              resources:
+                requests:
+                  "gpu.intel.com/i915": "2"
+                  cpu: "32"
+                  memory: "16Gi"
+                limits:
+                  "gpu.intel.com/i915": "2"
+              hostIPC: true
+              volumeMounts:
+              - mountPath: /buildkite/workspace
+                name: workspace
+
+  - label: "Pytest - Core & Engine"
+    depends_on: "build-container"
+    soft_fail: true
+    agents:
+      queue: "intel-xpu-kubevirt"
+    commands:
+      - sh .buildkite/scripts/hardware_ci/run-xpu-test.sh pytest-core-engine
+    secrets:
+      - REGISTRY_TOKEN
+      - HF_TOKEN
+      - REGISTRY_USER
+      - REGISTRY
+    plugins:
+      - kubernetes:
+          podSpecPatch:
+            imagePullSecrets:
+              - name: sharvilshah-1-pull-secret
+            containers:
+            - name: container-0
+              image: quay.io/sharvilshah-1/vllm-ci:${BUILDKITE_COMMIT}
+              resources:
+                requests:
+                  "gpu.intel.com/i915": "2"
+                  cpu: "32"
+                  memory: "16Gi"
+                limits:
+                  "gpu.intel.com/i915": "2"
+              hostIPC: true
+              volumeMounts:
+              - mountPath: /buildkite/workspace
+                name: workspace
+
+  - label: "Pytest - Sample & Worker"
+    depends_on: "build-container"
+    soft_fail: true
+    agents:
+      queue: "intel-xpu-kubevirt"
+    commands:
+      - sh .buildkite/scripts/hardware_ci/run-xpu-test.sh pytest-sample-worker
+    secrets:
+      - REGISTRY_TOKEN
+      - HF_TOKEN
+      - REGISTRY_USER
+      - REGISTRY
+    plugins:
+      - kubernetes:
+          podSpecPatch:
+            imagePullSecrets:
+              - name: sharvilshah-1-pull-secret
+            containers:
+            - name: container-0
+              image: quay.io/sharvilshah-1/vllm-ci:${BUILDKITE_COMMIT}
+              resources:
+                requests:
+                  "gpu.intel.com/i915": "2"
+                  cpu: "32"
+                  memory: "16Gi"
+                limits:
+                  "gpu.intel.com/i915": "2"
+              hostIPC: true
+              volumeMounts:
+              - mountPath: /buildkite/workspace
+                name: workspace
+
+  - label: "Pytest - Structured Output & Spec Decode"
+    depends_on: "build-container"
+    soft_fail: true
+    agents:
+      queue: "intel-xpu-kubevirt"
+    commands:
+      - sh .buildkite/scripts/hardware_ci/run-xpu-test.sh pytest-spec-structured
+    secrets:
+      - REGISTRY_TOKEN
+      - HF_TOKEN
+      - REGISTRY_USER
+      - REGISTRY
+    plugins:
+      - kubernetes:
+          podSpecPatch:
+            imagePullSecrets:
+              - name: sharvilshah-1-pull-secret
+            containers:
+            - name: container-0
+              image: quay.io/sharvilshah-1/vllm-ci:${BUILDKITE_COMMIT}
+              resources:
+                requests:
+                  "gpu.intel.com/i915": "2"
+                  cpu: "32"
+                  memory: "16Gi"
+                limits:
+                  "gpu.intel.com/i915": "2"
+              hostIPC: true
+              volumeMounts:
+              - mountPath: /buildkite/workspace
+                name: workspace
+
+  - label: "Pytest - KV Connector & Serial Utils"
+    depends_on: "build-container"
+    soft_fail: true
+    agents:
+      queue: "intel-xpu-kubevirt"
+    commands:
+      - sh .buildkite/scripts/hardware_ci/run-xpu-test.sh pytest-kv-serial
+    secrets:
+      - REGISTRY_TOKEN
+      - HF_TOKEN
+      - REGISTRY_USER
+      - REGISTRY
+    plugins:
+      - kubernetes:
+          podSpecPatch:
+            imagePullSecrets:
+              - name: sharvilshah-1-pull-secret
+            containers:
+            - name: container-0
+              image: quay.io/sharvilshah-1/vllm-ci:${BUILDKITE_COMMIT}
+              resources:
+                requests:
+                  "gpu.intel.com/i915": "2"
+                  cpu: "32"
+                  memory: "16Gi"
+                limits:
+                  "gpu.intel.com/i915": "2"
+              hostIPC: true
+              volumeMounts:
+              - mountPath: /buildkite/workspace
+                name: workspace
 
