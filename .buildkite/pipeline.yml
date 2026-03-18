@@ -1,0 +1,59 @@
+steps:
+  - label: "Build Container"
+    key: "build-container"
+    agents:
+      queue: "docker-build"
+    commands:
+      - sh .buildkite/scripts/hardware_ci/build-container.sh
+    secrets:
+      - REGISTRY_TOKEN
+      - REGISTRY_USER
+      - REGISTRY
+    plugins:
+      - kubernetes:
+          podSpecPatch:
+            containers:
+            - name: container-0
+              image: moby/buildkit:latest   # buildctl is the only tool needed here
+              resources:
+                requests:
+                  cpu: "8"
+                  memory: "16Gi"
+
+  - label: "Intel GPU Test"
+    depends_on: "build-container"
+    soft_fail: true
+    agents:
+     queue: "intel-xpu-kubevirt"
+    commands: 
+    - sh .buildkite/scripts/hardware_ci/run-xpu-test.sh
+    env:
+      DOCKER_HOST: tcp://localhost:2375
+      #REGISTRY_USER: ${REGISTRY_USER}
+      #REGISTRY: ${REGISTRY}
+    secrets:
+      - REGISTRY_TOKEN
+      - HF_TOKEN
+      - REGISTRY_USER
+      - REGISTRY
+    plugins:
+      - kubernetes:
+          podSpecPatch:
+            imagePullSecrets:
+              - name: sharvilshah-1-pull-secret
+            containers:
+            - name: container-0
+              image: quay.io/sharvilshah-1/vllm-ci:${BUILDKITE_COMMIT}   # built by build-container step
+              resources:           #     Currently under experimentation to make this more ergonomic.
+                requests:
+                  "gpu.intel.com/i915": "2"
+                  cpu: "32"
+                  memory: "16Gi"
+                limits:
+                  "gpu.intel.com/i915": "2"
+              hostIPC: true
+              volumeMounts:
+              - mountPath: /buildkite/workspace
+                name: workspace
+              #command: [""]
+
