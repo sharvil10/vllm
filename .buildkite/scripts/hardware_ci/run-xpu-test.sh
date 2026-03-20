@@ -11,6 +11,9 @@ set -ex
 # echo $USER
 # whoami
 # cd /workspace/vllm
+
+echo "pr-8"
+
 git rev-parse HEAD
 pip install tblib==3.1.0
 python3 examples/offline_inference/basic/generate.py --model facebook/opt-125m --block-size 64 --enforce-eager
