@@ -22,6 +22,7 @@ steps:
           --opt filename=Dockerfile.xpu \
           --opt build-arg:max_jobs=8 \
           --opt build-arg:buildkite_commit="${BUILDKITE_COMMIT}" \
+          --opt network=host \
           --progress=plain
     plugins:
       - kubernetes:
