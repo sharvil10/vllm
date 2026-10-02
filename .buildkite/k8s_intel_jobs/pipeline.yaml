@@ -1,0 +1,41 @@
+---
+# vLLM Intel XPU CI, Kubernetes-native rewrite.
+#
+# Target: Buildkite agent-stack-k8s controller watching queue=intel-xpu.
+# Each step becomes a Pod in the controller's namespace (vllm-ci).
+# Non-upstream: lives on the fork branch k8s-ci-bringup, not vllm-project/vllm.
+steps:
+  - label: ":docker: build xpu image (buildkit)"
+    key: build-xpu
+    agents:
+      queue: intel-xpu
+    commands:
+      - |
+        set -euo pipefail
+        # buildctl-daemonless.sh spawns buildkitd inline; needs privileged.
+        # Non-rootless image; a rootless pass is a follow-up.
+        buildctl-daemonless.sh build \
+          --frontend=dockerfile.v0 \
+          --local context=. \
+          --local dockerfile=./docker \
+          --opt filename=Dockerfile.xpu \
+          --opt build-arg:max_jobs=8 \
+          --opt build-arg:buildkite_commit="${BUILDKITE_COMMIT}" \
+          --progress=plain \
+          --output "type=cacheonly"
+    plugins:
+      - kubernetes:
+          podSpec:
+            containers:
+              - image: moby/buildkit:v0.16.0
+                securityContext:
+                  privileged: true
+                resources:
+                  requests:
+                    cpu: "2"
+                    memory: "4Gi"
+                    ephemeral-storage: "40Gi"
+                  limits:
+                    cpu: "8"
+                    memory: "16Gi"
+                    ephemeral-storage: "60Gi"
