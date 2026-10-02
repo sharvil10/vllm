@@ -59,3 +59,36 @@ steps:
                   items:
                     - key: .dockerconfigjson
                       path: config.json
+
+  - label: ":test_tube: XPU smoke: opt-125m generate.py"
+    key: xpu-smoke
+    depends_on: build-xpu
+    agents:
+      queue: intel-xpu
+    commands:
+      - |
+        set -euo pipefail
+        # Image has vLLM installed in /opt/venv. The agent-stack-k8s checkout
+        # provides the examples/ source at $BUILDKITE_BUILD_CHECKOUT_PATH.
+        # Run via absolute script path so sys.path[0] = examples/.../ and the
+        # installed vllm takes precedence over the local source dir.
+        source /opt/venv/bin/activate
+        python3 "$BUILDKITE_BUILD_CHECKOUT_PATH/examples/basic/offline_inference/generate.py" \
+          --model facebook/opt-125m --block-size 64 --enforce-eager
+    plugins:
+      - kubernetes:
+          podSpec:
+            resourceClaims:
+              - name: gpu
+                resourceClaimTemplateName: intel-gpu-claim
+            containers:
+              - image: ghcr.io/sharvil10/vllm-xpu:${BUILDKITE_COMMIT}-xpu
+                resources:
+                  claims:
+                    - name: gpu
+                  requests:
+                    cpu: "2"
+                    memory: "8Gi"
+                  limits:
+                    cpu: "8"
+                    memory: "16Gi"
