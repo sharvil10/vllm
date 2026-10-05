@@ -35,6 +35,13 @@ steps:
     plugins:
       - kubernetes:
           podSpec:
+            volumes:
+              # Default /dev/shm in a k8s Pod is 64 MiB; vLLM's TP
+              # shm_broadcast needs ~160 MiB. 1 GiB is comfy.
+              - name: dshm
+                emptyDir:
+                  medium: Memory
+                  sizeLimit: 1Gi
             resourceClaims:
               - name: gpu
                 resourceClaimTemplateName: intel-gpu-1
@@ -44,6 +51,9 @@ steps:
                   <<: *resources
                   claims:
                     - name: gpu
+                volumeMounts:
+                  - name: dshm
+                    mountPath: /dev/shm
 
   - label: ":video_game::video_game: 2-GPU: opt-125m --tp 2"
     key: gpu-2
@@ -59,6 +69,13 @@ steps:
     plugins:
       - kubernetes:
           podSpec:
+            volumes:
+              # Default /dev/shm in a k8s Pod is 64 MiB; vLLM's TP
+              # shm_broadcast needs ~160 MiB. 1 GiB is comfy.
+              - name: dshm
+                emptyDir:
+                  medium: Memory
+                  sizeLimit: 1Gi
             resourceClaims:
               - name: gpu
                 resourceClaimTemplateName: intel-gpu-2
@@ -68,6 +85,9 @@ steps:
                   <<: *resources
                   claims:
                     - name: gpu
+                volumeMounts:
+                  - name: dshm
+                    mountPath: /dev/shm
 
   - label: ":video_game::video_game::video_game::video_game: 4-GPU: enumerate only"
     key: gpu-4
@@ -83,6 +103,13 @@ steps:
     plugins:
       - kubernetes:
           podSpec:
+            volumes:
+              # Default /dev/shm in a k8s Pod is 64 MiB; vLLM's TP
+              # shm_broadcast needs ~160 MiB. 1 GiB is comfy.
+              - name: dshm
+                emptyDir:
+                  medium: Memory
+                  sizeLimit: 1Gi
             resourceClaims:
               - name: gpu
                 resourceClaimTemplateName: intel-gpu-4
@@ -92,6 +119,9 @@ steps:
                   <<: *resources
                   claims:
                     - name: gpu
+                volumeMounts:
+                  - name: dshm
+                    mountPath: /dev/shm
 
   - label: ":video_game: x8: all 8 GPUs: enumerate only"
     key: gpu-8
@@ -104,6 +134,13 @@ steps:
     plugins:
       - kubernetes:
           podSpec:
+            volumes:
+              # Default /dev/shm in a k8s Pod is 64 MiB; vLLM's TP
+              # shm_broadcast needs ~160 MiB. 1 GiB is comfy.
+              - name: dshm
+                emptyDir:
+                  medium: Memory
+                  sizeLimit: 1Gi
             resourceClaims:
               - name: gpu
                 resourceClaimTemplateName: intel-gpu-8
@@ -113,3 +150,6 @@ steps:
                   <<: *resources
                   claims:
                     - name: gpu
+                volumeMounts:
+                  - name: dshm
+                    mountPath: /dev/shm
