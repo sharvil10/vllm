@@ -17,6 +17,12 @@ steps:
         # can't resolve some CloudFront names, e.g. sh.rustup.rs).
         # Pushes to ghcr.io/sharvil10/vllm-xpu:<commit>-xpu. BuildKit reads
         # auth from $DOCKER_CONFIG/config.json; see ghcr-auth volume.
+        # Cache layers are stored in a sibling GHCR package (vllm-xpu-buildcache).
+        # First build populates it; subsequent builds import unchanged stages,
+        # cutting cold cost from ~65m to a few minutes for code-only changes.
+        # mode=max exports intermediate layers too; ignore-error=true keeps
+        # the build green if the cache write races.
+        CACHE_REF=ghcr.io/sharvil10/vllm-xpu-buildcache:main
         buildctl-daemonless.sh build \
           --frontend=dockerfile.v0 \
           --local context=. \
@@ -26,6 +32,8 @@ steps:
           --opt build-arg:buildkite_commit="${BUILDKITE_COMMIT}" \
           --opt network=host \
           --progress=plain \
+          --import-cache "type=registry,ref=${CACHE_REF}" \
+          --export-cache "type=registry,ref=${CACHE_REF},mode=max,ignore-error=true" \
           --output "type=image,name=ghcr.io/sharvil10/vllm-xpu:${BUILDKITE_COMMIT}-xpu,push=true"
     plugins:
       - kubernetes:
