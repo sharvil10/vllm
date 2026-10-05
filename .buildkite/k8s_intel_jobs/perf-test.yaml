@@ -1,0 +1,115 @@
+---
+# vLLM Intel XPU multi-GPU test pipeline.
+#
+# Manually triggered (separate BK pipeline: vllm-intel-perf). Fans out
+# across GPU counts: 1 / 2 / 4 / 8. Each step is a single Pod claiming
+# that many Arc Pro B70s via DRA (ResourceClaimTemplate intel-gpu-<N>).
+#
+# NOTE: starvation can happen if small-N jobs keep arriving ahead of
+# large-N. kube-scheduler is FIFO-over-fit, no reservation for Pending
+# bigger Pods. See [[buildkite-vllm-intel-ci]] memory for the long-term
+# fix (Kueue on top).
+#
+# Image is the same pinned XPU build as pipeline.yaml.
+.image: &image ghcr.io/sharvil10/vllm-xpu:12a974de181da1f39e54dca0d174e07f4f4d75a8-xpu
+
+.resources: &resources
+  requests:
+    cpu: "2"
+    memory: "8Gi"
+  limits:
+    cpu: "8"
+    memory: "16Gi"
+
+steps:
+  - label: ":video_game: 1-GPU: opt-125m"
+    key: gpu-1
+    agents:
+      queue: intel-xpu
+    commands:
+      - |
+        set -eu
+        /opt/venv/bin/python3 -c "import torch; print('xpu count:', torch.xpu.device_count()); [print(f'  xpu:{i}: {torch.xpu.get_device_name(i)}') for i in range(torch.xpu.device_count())]"
+        /opt/venv/bin/python3 "$BUILDKITE_BUILD_CHECKOUT_PATH/examples/basic/offline_inference/generate.py" \
+          --model facebook/opt-125m --block-size 64 --enforce-eager
+    plugins:
+      - kubernetes:
+          podSpec:
+            resourceClaims:
+              - name: gpu
+                resourceClaimTemplateName: intel-gpu-1
+            containers:
+              - image: *image
+                resources:
+                  <<: *resources
+                  claims:
+                    - name: gpu
+
+  - label: ":video_game::video_game: 2-GPU: opt-125m --tp 2"
+    key: gpu-2
+    agents:
+      queue: intel-xpu
+    commands:
+      - |
+        set -eu
+        /opt/venv/bin/python3 -c "import torch; print('xpu count:', torch.xpu.device_count()); [print(f'  xpu:{i}: {torch.xpu.get_device_name(i)}') for i in range(torch.xpu.device_count())]"
+        /opt/venv/bin/python3 "$BUILDKITE_BUILD_CHECKOUT_PATH/examples/basic/offline_inference/generate.py" \
+          --model facebook/opt-125m --block-size 64 --enforce-eager \
+          -tp 2 --distributed-executor-backend mp
+    plugins:
+      - kubernetes:
+          podSpec:
+            resourceClaims:
+              - name: gpu
+                resourceClaimTemplateName: intel-gpu-2
+            containers:
+              - image: *image
+                resources:
+                  <<: *resources
+                  claims:
+                    - name: gpu
+
+  - label: ":video_game::video_game::video_game::video_game: 4-GPU: enumerate only"
+    key: gpu-4
+    agents:
+      queue: intel-xpu
+    commands:
+      - |
+        set -eu
+        # TP > 2 needs a model with head-count divisible by N; opt-125m has 12.
+        # First iteration just proves DRA attaches 4 devices. Swap in a
+        # 16-head or 32-head model (opt-350m, Qwen etc.) for actual TP perf.
+        /opt/venv/bin/python3 -c "import torch; print('xpu count:', torch.xpu.device_count()); [print(f'  xpu:{i}: {torch.xpu.get_device_name(i)}') for i in range(torch.xpu.device_count())]"
+    plugins:
+      - kubernetes:
+          podSpec:
+            resourceClaims:
+              - name: gpu
+                resourceClaimTemplateName: intel-gpu-4
+            containers:
+              - image: *image
+                resources:
+                  <<: *resources
+                  claims:
+                    - name: gpu
+
+  - label: ":video_game: x8: all 8 GPUs: enumerate only"
+    key: gpu-8
+    agents:
+      queue: intel-xpu
+    commands:
+      - |
+        set -eu
+        /opt/venv/bin/python3 -c "import torch; print('xpu count:', torch.xpu.device_count()); [print(f'  xpu:{i}: {torch.xpu.get_device_name(i)}') for i in range(torch.xpu.device_count())]"
+    plugins:
+      - kubernetes:
+          podSpec:
+            resourceClaims:
+              - name: gpu
+                resourceClaimTemplateName: intel-gpu-8
+            containers:
+              - image: *image
+                resources:
+                  <<: *resources
+                  claims:
+                    - name: gpu
