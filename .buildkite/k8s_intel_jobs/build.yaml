@@ -1,0 +1,67 @@
+---
+# vLLM Intel XPU — image build pipeline (dormant).
+#
+# NOT referenced by the active vllm-intel-ci Buildkite pipeline. Rebuilds
+# are infrequent (Dockerfile.xpu, oneAPI, Rust toolchain changes). To trigger
+# a rebuild, run against this file explicitly, e.g.:
+#
+#     buildkite-agent pipeline upload .buildkite/k8s_intel_jobs/build.yaml
+#
+# or create a dedicated BK pipeline (e.g. vllm-intel-build) pointing at this
+# file. Pushes to ghcr.io/sharvil10/vllm-xpu:<commit>-xpu AND caches layers
+# to ghcr.io/sharvil10/vllm-xpu-buildcache:main.
+steps:
+  - label: ":docker: build xpu image (buildkit)"
+    key: build-xpu
+    agents:
+      queue: intel-xpu
+    commands:
+      - |
+        set -euo pipefail
+        # buildctl-daemonless.sh spawns buildkitd inline; needs privileged.
+        # --opt network=host because BuildKit sandbox DNS can't resolve some
+        # CloudFront names (sh.rustup.rs, astral.sh). BuildKit reads GHCR
+        # auth from $DOCKER_CONFIG/config.json; see ghcr-auth volume.
+        CACHE_REF=ghcr.io/sharvil10/vllm-xpu-buildcache:main
+        buildctl-daemonless.sh build \
+          --frontend=dockerfile.v0 \
+          --local context=. \
+          --local dockerfile=./docker \
+          --opt filename=Dockerfile.xpu \
+          --opt build-arg:max_jobs=8 \
+          --opt build-arg:buildkite_commit="${BUILDKITE_COMMIT}" \
+          --opt network=host \
+          --progress=plain \
+          --import-cache "type=registry,ref=${CACHE_REF}" \
+          --export-cache "type=registry,ref=${CACHE_REF},mode=max,ignore-error=true" \
+          --output "type=image,name=ghcr.io/sharvil10/vllm-xpu:${BUILDKITE_COMMIT}-xpu,push=true"
+    plugins:
+      - kubernetes:
+          podSpec:
+            containers:
+              - image: moby/buildkit:v0.16.0
+                securityContext:
+                  privileged: true
+                env:
+                  - name: DOCKER_CONFIG
+                    value: /ghcr-auth
+                resources:
+                  requests:
+                    cpu: "2"
+                    memory: "4Gi"
+                    ephemeral-storage: "40Gi"
+                  limits:
+                    cpu: "8"
+                    memory: "16Gi"
+                    ephemeral-storage: "60Gi"
+                volumeMounts:
+                  - name: ghcr-auth
+                    mountPath: /ghcr-auth
+                    readOnly: true
+            volumes:
+              - name: ghcr-auth
+                secret:
+                  secretName: ghcr-push
+                  items:
+                    - key: .dockerconfigjson
+                      path: config.json

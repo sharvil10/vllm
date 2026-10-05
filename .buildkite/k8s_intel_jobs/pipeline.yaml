@@ -3,83 +3,25 @@
 #
 # Target: Buildkite agent-stack-k8s controller watching queue=intel-xpu.
 # Each step becomes a Pod in the controller's namespace (vllm-ci).
-# Non-upstream: lives on the fork branch k8s-ci-bringup, not vllm-project/vllm.
+# Non-upstream: lives on the fork branch k8s-ci-bringup.
+#
+# PR builds run tests ONLY — against a prebuilt image. Rebuild workflow
+# is in .buildkite/k8s_intel_jobs/build.yaml and is invoked separately.
+# Update IMAGE below after each intentional rebuild.
 steps:
-  - label: ":docker: build xpu image (buildkit)"
-    key: build-xpu
-    agents:
-      queue: intel-xpu
-    commands:
-      - |
-        set -euo pipefail
-        # buildctl-daemonless.sh spawns buildkitd inline; needs privileged.
-        # --opt network=host so RUN inherits the pod resolver (sandbox DNS
-        # can't resolve some CloudFront names, e.g. sh.rustup.rs).
-        # Pushes to ghcr.io/sharvil10/vllm-xpu:<commit>-xpu. BuildKit reads
-        # auth from $DOCKER_CONFIG/config.json; see ghcr-auth volume.
-        # Cache layers are stored in a sibling GHCR package (vllm-xpu-buildcache).
-        # First build populates it; subsequent builds import unchanged stages,
-        # cutting cold cost from ~65m to a few minutes for code-only changes.
-        # mode=max exports intermediate layers too; ignore-error=true keeps
-        # the build green if the cache write races.
-        CACHE_REF=ghcr.io/sharvil10/vllm-xpu-buildcache:main
-        buildctl-daemonless.sh build \
-          --frontend=dockerfile.v0 \
-          --local context=. \
-          --local dockerfile=./docker \
-          --opt filename=Dockerfile.xpu \
-          --opt build-arg:max_jobs=8 \
-          --opt build-arg:buildkite_commit="${BUILDKITE_COMMIT}" \
-          --opt network=host \
-          --progress=plain \
-          --import-cache "type=registry,ref=${CACHE_REF}" \
-          --export-cache "type=registry,ref=${CACHE_REF},mode=max,ignore-error=true" \
-          --output "type=image,name=ghcr.io/sharvil10/vllm-xpu:${BUILDKITE_COMMIT}-xpu,push=true"
-    plugins:
-      - kubernetes:
-          podSpec:
-            containers:
-              - image: moby/buildkit:v0.16.0
-                securityContext:
-                  privileged: true
-                env:
-                  - name: DOCKER_CONFIG
-                    value: /ghcr-auth
-                resources:
-                  requests:
-                    cpu: "2"
-                    memory: "4Gi"
-                    ephemeral-storage: "40Gi"
-                  limits:
-                    cpu: "8"
-                    memory: "16Gi"
-                    ephemeral-storage: "60Gi"
-                volumeMounts:
-                  - name: ghcr-auth
-                    mountPath: /ghcr-auth
-                    readOnly: true
-            volumes:
-              - name: ghcr-auth
-                secret:
-                  secretName: ghcr-push
-                  # Dockerconfigjson Secret stores the file as `.dockerconfigjson`;
-                  # BuildKit expects `config.json` under $DOCKER_CONFIG, so rename.
-                  items:
-                    - key: .dockerconfigjson
-                      path: config.json
-
   - label: ":test_tube: XPU smoke: opt-125m generate.py"
     key: xpu-smoke
-    depends_on: build-xpu
     agents:
       queue: intel-xpu
+    # Pinned image: last known-good XPU build (build 9, 2026-10-02).
+    # Bump the container image below after each intentional rebuild via build.yaml.
     commands:
       - |
         set -euo pipefail
-        # Image has vLLM installed in /opt/venv. The agent-stack-k8s checkout
-        # provides the examples/ source at $BUILDKITE_BUILD_CHECKOUT_PATH.
-        # Run via absolute script path so sys.path[0] = examples/.../ and the
-        # installed vllm takes precedence over the local source dir.
+        # Image has vLLM installed in /opt/venv. agent-stack-k8s clones
+        # the vllm source at $BUILDKITE_BUILD_CHECKOUT_PATH; run via
+        # absolute path so sys.path[0] = examples/.../ and the installed
+        # vllm takes precedence over the checkout's local source tree.
         source /opt/venv/bin/activate
         python3 "$BUILDKITE_BUILD_CHECKOUT_PATH/examples/basic/offline_inference/generate.py" \
           --model facebook/opt-125m --block-size 64 --enforce-eager
@@ -90,7 +32,7 @@ steps:
               - name: gpu
                 resourceClaimTemplateName: intel-gpu-claim
             containers:
-              - image: ghcr.io/sharvil10/vllm-xpu:${BUILDKITE_COMMIT}-xpu
+              - image: ghcr.io/sharvil10/vllm-xpu:12a974de181da1f39e54dca0d174e07f4f4d75a8-xpu
                 resources:
                   claims:
                     - name: gpu
