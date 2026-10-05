@@ -18,13 +18,12 @@ steps:
     commands:
       - |
         set -eu
-        # Image's /bin/sh is dash; no -o pipefail. No pipes here anyway.
-        # Image has vLLM installed in /opt/venv. agent-stack-k8s clones
-        # the vllm source at $BUILDKITE_BUILD_CHECKOUT_PATH; run via
-        # absolute path so sys.path[0] = examples/.../ and the installed
-        # vllm takes precedence over the checkout's local source tree.
-        source /opt/venv/bin/activate
-        python3 "$BUILDKITE_BUILD_CHECKOUT_PATH/examples/basic/offline_inference/generate.py" \
+        # Image's /bin/sh is dash; no bash features (pipefail, source).
+        # Call the venv python directly instead of activating.
+        # Run via absolute script path so sys.path[0] = examples/.../ and
+        # the installed vllm takes precedence over the checkout's local
+        # source tree.
+        /opt/venv/bin/python3 "$BUILDKITE_BUILD_CHECKOUT_PATH/examples/basic/offline_inference/generate.py" \
           --model facebook/opt-125m --block-size 64 --enforce-eager
     plugins:
       - kubernetes:
