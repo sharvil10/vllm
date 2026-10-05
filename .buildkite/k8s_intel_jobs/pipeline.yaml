@@ -17,7 +17,8 @@ steps:
     # Bump the container image below after each intentional rebuild via build.yaml.
     commands:
       - |
-        set -euo pipefail
+        set -eu
+        # Image's /bin/sh is dash; no -o pipefail. No pipes here anyway.
         # Image has vLLM installed in /opt/venv. agent-stack-k8s clones
         # the vllm source at $BUILDKITE_BUILD_CHECKOUT_PATH; run via
         # absolute path so sys.path[0] = examples/.../ and the installed
