@@ -47,3 +47,47 @@ steps:
                   limits:
                     cpu: "8"
                     memory: "16Gi"
+
+  # Scale test: only runs when a build is created with SCALE_TEST=true.
+  # Fans out N identical GPU jobs so controller scale-out and Kueue
+  # admission/borrowing can be observed. Holds the GPU ~2 min so the
+  # overlap is visible.
+  - label: ":chart_with_upwards_trend: scale test {{matrix}}"
+    key: scale-test
+    if: build.env("SCALE_TEST") == "true"
+    agents:
+      queue: intel-xpu
+    matrix:
+      - "1"
+      - "2"
+      - "3"
+      - "4"
+      - "5"
+      - "6"
+    commands:
+      - |
+        set -eu
+        echo "shard {{matrix}} on $(hostname)"
+        /opt/venv/bin/python3 -c 'import torch; print("xpu devices:", torch.xpu.device_count())'
+        sleep 120
+    plugins:
+      - kubernetes:
+          metadata:
+            labels:
+              kueue.x-k8s.io/queue-name: ci
+              kueue.x-k8s.io/priority-class: priority-low
+          podSpec:
+            resourceClaims:
+              - name: gpu
+                resourceClaimTemplateName: intel-gpu-claim
+            containers:
+              - image: ghcr.io/sharvil10/vllm-xpu:12a974de181da1f39e54dca0d174e07f4f4d75a8-xpu
+                resources:
+                  claims:
+                    - name: gpu
+                  requests:
+                    cpu: "2"
+                    memory: "4Gi"
+                  limits:
+                    cpu: "4"
+                    memory: "8Gi"
