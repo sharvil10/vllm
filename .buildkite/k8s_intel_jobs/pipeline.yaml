@@ -27,6 +27,11 @@ steps:
           --model facebook/opt-125m --block-size 64 --enforce-eager
     plugins:
       - kubernetes:
+          # Kueue holds the Job until ci-cq has quota, then admits it.
+          metadata:
+            labels:
+              kueue.x-k8s.io/queue-name: ci
+              kueue.x-k8s.io/priority-class: priority-normal
           podSpec:
             resourceClaims:
               - name: gpu
