@@ -4,30 +4,25 @@
 # Manually triggered (separate BK pipeline: vllm-intel-perf). Fans out
 # across GPU counts: 1 / 2 / 4 / 8. Each step is a single Pod claiming
 # that many Arc Pro B70s via DRA (ResourceClaimTemplate b70-<N>)
-# and runs `vllm bench throughput` on Qwen3-8B (32 heads / 8 KV heads,
-# so TP=1/2/4/8 all shard evenly; bf16 weights ~16 GiB fit in one 32 GiB
-# B70). The load keeps the GPUs busy so xpumd's hw_gpu_utilization_ratio
-# visibly moves on the vLLM-CI Grafana dashboard.
-#
-# Prompt counts are sized from measured throughput (1024 in / 256 out,
-# --enforce-eager) so each step has ~60-90 s of GPU-bound work:
-#   TP1 ~3.9 req/s -> 320 prompts    TP2 ~7.5 req/s -> 512 prompts
-#   TP4 ~1.6 req/s -> 128 prompts    TP8 ~1.1 req/s ->  96 prompts
-# TP4/TP8 are slower than TP2: the B70s are PCIe-only (no XeLink), so every
-# layer's all-reduce crosses PCIe. Expected; the goal is sustained load,
-# not scaling.
+# and runs `vllm bench throughput` on Qwen3-1.7B (16 heads / 8 KV heads, so
+# TP=1/2/4/8 all shard evenly; ~3.4 GiB of bf16 weights). It is deliberately
+# small and short so a demo build finishes quickly while still keeping the
+# GPUs busy enough that xpumd's hw_gpu_utilization_ratio visibly moves on the
+# vLLM-CI Grafana dashboard. Prompt counts shrink as GPU count grows because
+# TP4/TP8 are communication-bound: the B70s are PCIe-only (no XeLink), so
+# every layer's all-reduce crosses PCIe. For longer/heavier load raise
+# --num-prompts (or switch back to Qwen/Qwen3-8B, which fits one 32 GiB B70).
 #
 # Startup: weights are read from a node-local HF cache (hostPath
-# /var/lib/hf-cache, ~16 GiB) so a run is ~50 s of load-weights + engine
-# init instead of a re-download. The first run on a node populates it.
-# Steps 1/2/4 fit on the 8-GPU worker together (7 GPUs); the 8-GPU step
-# stays Pending until they release theirs.
+# /var/lib/hf-cache) so a run skips the model download; the first run on a
+# node populates it. Steps 1/2/4 fit on the 8-GPU worker together (7 GPUs);
+# the 8-GPU step waits for them to release theirs.
 #
-# Every step is admitted through Kueue (LocalQueue vllm-ci/ci-b70 -> ci-b70-cq,
-# StrictFIFO). Plain kube-scheduler would let 1/2/4-GPU pods keep taking
-# freed GPUs and starve the 8-GPU step forever; with StrictFIFO the 8-GPU
-# workload at the head of the queue blocks later arrivals until it fits.
-# Pods stay SchedulingGated (no GPU claim) until admitted.
+# Every step is admitted through Kueue (LocalQueue vllm-ci/ci-b70 ->
+# ci-b70-cq) and stays SchedulingGated, with no GPU claim, until admitted.
+# NOTE: ci-b70-cq is BestEffortFIFO, so smaller steps can still be admitted
+# ahead of a waiting 8-GPU step when two builds overlap. Run builds one at a
+# time, or switch the queue to StrictFIFO, if that matters.
 #
 # Image is the same pinned XPU build as pipeline.yaml.
 .image: &image ghcr.io/sharvil10/vllm-xpu:12a974de181da1f39e54dca0d174e07f4f4d75a8-xpu
@@ -67,7 +62,7 @@
     mountPath: /hf-cache
 
 steps:
-  - label: ":video_game: 1-GPU: Qwen3-8B bench"
+  - label: ":video_game: 1-GPU: Qwen3-1.7B bench"
     key: gpu-1
     agents:
       queue: intel-b70
@@ -75,8 +70,8 @@ steps:
       - |
         set -eu
         /opt/venv/bin/python3 -c "import torch; print('xpu count:', torch.xpu.device_count()); [print(f'  xpu:{i}: {torch.xpu.get_device_name(i)}') for i in range(torch.xpu.device_count())]"
-        /opt/venv/bin/vllm bench throughput --model Qwen/Qwen3-8B \
-          --input-len 1024 --output-len 256 --num-prompts 320 \
+        /opt/venv/bin/vllm bench throughput --model Qwen/Qwen3-1.7B \
+          --input-len 1024 --output-len 256 --num-prompts 160 \
           --max-model-len 2048 --block-size 64 --enforce-eager
     plugins:
       - kubernetes:
@@ -98,7 +93,7 @@ steps:
                     - name: gpu
                 volumeMounts: *mounts
 
-  - label: ":video_game::video_game: 2-GPU: Qwen3-8B bench --tp 2"
+  - label: ":video_game::video_game: 2-GPU: Qwen3-1.7B bench --tp 2"
     key: gpu-2
     agents:
       queue: intel-b70
@@ -106,8 +101,8 @@ steps:
       - |
         set -eu
         /opt/venv/bin/python3 -c "import torch; print('xpu count:', torch.xpu.device_count()); [print(f'  xpu:{i}: {torch.xpu.get_device_name(i)}') for i in range(torch.xpu.device_count())]"
-        /opt/venv/bin/vllm bench throughput --model Qwen/Qwen3-8B \
-          --input-len 1024 --output-len 256 --num-prompts 512 \
+        /opt/venv/bin/vllm bench throughput --model Qwen/Qwen3-1.7B \
+          --input-len 1024 --output-len 256 --num-prompts 256 \
           --max-model-len 2048 --block-size 64 --enforce-eager \
           -tp 2 --distributed-executor-backend mp
     plugins:
@@ -130,7 +125,7 @@ steps:
                     - name: gpu
                 volumeMounts: *mounts
 
-  - label: ":video_game::video_game::video_game::video_game: 4-GPU: Qwen3-8B bench --tp 4"
+  - label: ":video_game::video_game::video_game::video_game: 4-GPU: Qwen3-1.7B bench --tp 4"
     key: gpu-4
     agents:
       queue: intel-b70
@@ -138,8 +133,8 @@ steps:
       - |
         set -eu
         /opt/venv/bin/python3 -c "import torch; print('xpu count:', torch.xpu.device_count()); [print(f'  xpu:{i}: {torch.xpu.get_device_name(i)}') for i in range(torch.xpu.device_count())]"
-        /opt/venv/bin/vllm bench throughput --model Qwen/Qwen3-8B \
-          --input-len 1024 --output-len 256 --num-prompts 128 \
+        /opt/venv/bin/vllm bench throughput --model Qwen/Qwen3-1.7B \
+          --input-len 1024 --output-len 256 --num-prompts 64 \
           --max-model-len 2048 --block-size 64 --enforce-eager \
           -tp 4 --distributed-executor-backend mp
     plugins:
@@ -162,7 +157,7 @@ steps:
                     - name: gpu
                 volumeMounts: *mounts
 
-  - label: ":video_game: x8: all 8 GPUs: Qwen3-8B bench --tp 8"
+  - label: ":video_game: x8: all 8 GPUs: Qwen3-1.7B bench --tp 8"
     key: gpu-8
     agents:
       queue: intel-b70
@@ -170,8 +165,8 @@ steps:
       - |
         set -eu
         /opt/venv/bin/python3 -c "import torch; print('xpu count:', torch.xpu.device_count()); [print(f'  xpu:{i}: {torch.xpu.get_device_name(i)}') for i in range(torch.xpu.device_count())]"
-        /opt/venv/bin/vllm bench throughput --model Qwen/Qwen3-8B \
-          --input-len 1024 --output-len 256 --num-prompts 96 \
+        /opt/venv/bin/vllm bench throughput --model Qwen/Qwen3-1.7B \
+          --input-len 1024 --output-len 256 --num-prompts 32 \
           --max-model-len 2048 --block-size 64 --enforce-eager \
           -tp 8 --distributed-executor-backend mp
     plugins:
