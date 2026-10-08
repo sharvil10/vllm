@@ -3,7 +3,7 @@
 #
 # Manually triggered (separate BK pipeline: vllm-intel-perf). Fans out
 # across GPU counts: 1 / 2 / 4 / 8. Each step is a single Pod claiming
-# that many Arc Pro B70s via DRA (ResourceClaimTemplate intel-gpu-<N>)
+# that many Arc Pro B70s via DRA (ResourceClaimTemplate b70-<N>)
 # and runs `vllm bench throughput` on Qwen3-8B (32 heads / 8 KV heads,
 # so TP=1/2/4/8 all shard evenly; bf16 weights ~16 GiB fit in one 32 GiB
 # B70). The load keeps the GPUs busy so xpumd's hw_gpu_utilization_ratio
@@ -23,10 +23,11 @@
 # Steps 1/2/4 fit on the 8-GPU worker together (7 GPUs); the 8-GPU step
 # stays Pending until they release theirs.
 #
-# NOTE: starvation can happen if small-N jobs keep arriving ahead of
-# large-N. kube-scheduler is FIFO-over-fit, no reservation for Pending
-# bigger Pods. See [[buildkite-vllm-intel-ci]] memory for the long-term
-# fix (Kueue on top).
+# Every step is admitted through Kueue (LocalQueue vllm-ci/ci-b70 -> ci-b70-cq,
+# StrictFIFO). Plain kube-scheduler would let 1/2/4-GPU pods keep taking
+# freed GPUs and starve the 8-GPU step forever; with StrictFIFO the 8-GPU
+# workload at the head of the queue blocks later arrivals until it fits.
+# Pods stay SchedulingGated (no GPU claim) until admitted.
 #
 # Image is the same pinned XPU build as pipeline.yaml.
 .image: &image ghcr.io/sharvil10/vllm-xpu:12a974de181da1f39e54dca0d174e07f4f4d75a8-xpu
@@ -69,7 +70,7 @@ steps:
   - label: ":video_game: 1-GPU: Qwen3-8B bench"
     key: gpu-1
     agents:
-      queue: intel-xpu
+      queue: intel-b70
     commands:
       - |
         set -eu
@@ -79,11 +80,15 @@ steps:
           --max-model-len 2048 --block-size 64 --enforce-eager
     plugins:
       - kubernetes:
+          metadata:
+            labels:
+              kueue.x-k8s.io/queue-name: ci-b70
+              kueue.x-k8s.io/priority-class: priority-normal
           podSpec:
             volumes: *volumes
             resourceClaims:
               - name: gpu
-                resourceClaimTemplateName: intel-gpu-1
+                resourceClaimTemplateName: b70-1
             containers:
               - image: *image
                 env: *env
@@ -96,7 +101,7 @@ steps:
   - label: ":video_game::video_game: 2-GPU: Qwen3-8B bench --tp 2"
     key: gpu-2
     agents:
-      queue: intel-xpu
+      queue: intel-b70
     commands:
       - |
         set -eu
@@ -107,11 +112,15 @@ steps:
           -tp 2 --distributed-executor-backend mp
     plugins:
       - kubernetes:
+          metadata:
+            labels:
+              kueue.x-k8s.io/queue-name: ci-b70
+              kueue.x-k8s.io/priority-class: priority-normal
           podSpec:
             volumes: *volumes
             resourceClaims:
               - name: gpu
-                resourceClaimTemplateName: intel-gpu-2
+                resourceClaimTemplateName: b70-2
             containers:
               - image: *image
                 env: *env
@@ -124,7 +133,7 @@ steps:
   - label: ":video_game::video_game::video_game::video_game: 4-GPU: Qwen3-8B bench --tp 4"
     key: gpu-4
     agents:
-      queue: intel-xpu
+      queue: intel-b70
     commands:
       - |
         set -eu
@@ -135,11 +144,15 @@ steps:
           -tp 4 --distributed-executor-backend mp
     plugins:
       - kubernetes:
+          metadata:
+            labels:
+              kueue.x-k8s.io/queue-name: ci-b70
+              kueue.x-k8s.io/priority-class: priority-normal
           podSpec:
             volumes: *volumes
             resourceClaims:
               - name: gpu
-                resourceClaimTemplateName: intel-gpu-4
+                resourceClaimTemplateName: b70-4
             containers:
               - image: *image
                 env: *env
@@ -152,7 +165,7 @@ steps:
   - label: ":video_game: x8: all 8 GPUs: Qwen3-8B bench --tp 8"
     key: gpu-8
     agents:
-      queue: intel-xpu
+      queue: intel-b70
     commands:
       - |
         set -eu
@@ -163,11 +176,15 @@ steps:
           -tp 8 --distributed-executor-backend mp
     plugins:
       - kubernetes:
+          metadata:
+            labels:
+              kueue.x-k8s.io/queue-name: ci-b70
+              kueue.x-k8s.io/priority-class: priority-normal
           podSpec:
             volumes: *volumes
             resourceClaims:
               - name: gpu
-                resourceClaimTemplateName: intel-gpu-8
+                resourceClaimTemplateName: b70-8
             containers:
               - image: *image
                 env: *env

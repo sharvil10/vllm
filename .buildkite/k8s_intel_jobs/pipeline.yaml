@@ -1,7 +1,7 @@
 ---
 # vLLM Intel XPU CI, Kubernetes-native rewrite.
 #
-# Target: Buildkite agent-stack-k8s controller watching queue=intel-xpu.
+# Target: Buildkite agent-stack-k8s controller watching queue=intel-b70.
 # Each step becomes a Pod in the controller's namespace (vllm-ci).
 # Non-upstream: lives on the fork branch k8s-ci-bringup.
 #
@@ -12,7 +12,7 @@ steps:
   - label: ":test_tube: XPU smoke: opt-125m generate.py"
     key: xpu-smoke
     agents:
-      queue: intel-xpu
+      queue: intel-b70
     # Pinned image: last known-good XPU build (build 9, 2026-10-02).
     # Bump the container image below after each intentional rebuild via build.yaml.
     commands:
@@ -30,12 +30,12 @@ steps:
           # Kueue holds the Job until ci-cq has quota, then admits it.
           metadata:
             labels:
-              kueue.x-k8s.io/queue-name: ci
+              kueue.x-k8s.io/queue-name: ci-b70
               kueue.x-k8s.io/priority-class: priority-normal
           podSpec:
             resourceClaims:
               - name: gpu
-                resourceClaimTemplateName: intel-gpu-claim
+                resourceClaimTemplateName: b70-1
             containers:
               - image: ghcr.io/sharvil10/vllm-xpu:12a974de181da1f39e54dca0d174e07f4f4d75a8-xpu
                 resources:
@@ -56,7 +56,7 @@ steps:
     key: scale-test
     if: build.env("SCALE_TEST") == "true"
     agents:
-      queue: intel-xpu
+      queue: intel-b70
     matrix:
       - "1"
       - "2"
@@ -74,12 +74,12 @@ steps:
       - kubernetes:
           metadata:
             labels:
-              kueue.x-k8s.io/queue-name: ci
+              kueue.x-k8s.io/queue-name: ci-b70
               kueue.x-k8s.io/priority-class: priority-low
           podSpec:
             resourceClaims:
               - name: gpu
-                resourceClaimTemplateName: intel-gpu-claim
+                resourceClaimTemplateName: b70-1
             containers:
               - image: ghcr.io/sharvil10/vllm-xpu:12a974de181da1f39e54dca0d174e07f4f4d75a8-xpu
                 resources:

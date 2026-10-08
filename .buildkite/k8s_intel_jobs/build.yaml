@@ -14,7 +14,7 @@ steps:
   - label: ":docker: build xpu image (buildkit)"
     key: build-xpu
     agents:
-      queue: intel-xpu
+      queue: intel-b70
     commands:
       - |
         set -euo pipefail
@@ -37,6 +37,12 @@ steps:
           --output "type=image,name=ghcr.io/sharvil10/vllm-xpu:${BUILDKITE_COMMIT}-xpu,push=true"
     plugins:
       - kubernetes:
+          # Image builds are CPU/memory only (no GPU claim) but still go
+          # through Kueue so they are counted against ci-b70-cq quota.
+          metadata:
+            labels:
+              kueue.x-k8s.io/queue-name: ci-b70
+              kueue.x-k8s.io/priority-class: priority-normal
           podSpec:
             containers:
               - image: moby/buildkit:v0.16.0
