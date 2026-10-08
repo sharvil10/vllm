@@ -1,9 +1,27 @@
 ---
-# vLLM Intel XPU multi-GPU test pipeline.
+# vLLM Intel XPU multi-GPU load pipeline.
 #
 # Manually triggered (separate BK pipeline: vllm-intel-perf). Fans out
 # across GPU counts: 1 / 2 / 4 / 8. Each step is a single Pod claiming
-# that many Arc Pro B70s via DRA (ResourceClaimTemplate intel-gpu-<N>).
+# that many Arc Pro B70s via DRA (ResourceClaimTemplate intel-gpu-<N>)
+# and runs `vllm bench throughput` on Qwen3-8B (32 heads / 8 KV heads,
+# so TP=1/2/4/8 all shard evenly; bf16 weights ~16 GiB fit in one 32 GiB
+# B70). The load keeps the GPUs busy so xpumd's hw_gpu_utilization_ratio
+# visibly moves on the vLLM-CI Grafana dashboard.
+#
+# Prompt counts are sized from measured throughput (1024 in / 256 out,
+# --enforce-eager) so each step has ~60-90 s of GPU-bound work:
+#   TP1 ~3.9 req/s -> 320 prompts    TP2 ~7.5 req/s -> 512 prompts
+#   TP4 ~1.6 req/s -> 128 prompts    TP8 ~1.1 req/s ->  96 prompts
+# TP4/TP8 are slower than TP2: the B70s are PCIe-only (no XeLink), so every
+# layer's all-reduce crosses PCIe. Expected; the goal is sustained load,
+# not scaling.
+#
+# Startup: weights are read from a node-local HF cache (hostPath
+# /var/lib/hf-cache, ~16 GiB) so a run is ~50 s of load-weights + engine
+# init instead of a re-download. The first run on a node populates it.
+# Steps 1/2/4 fit on the 8-GPU worker together (7 GPUs); the 8-GPU step
+# stays Pending until they release theirs.
 #
 # NOTE: starvation can happen if small-N jobs keep arriving ahead of
 # large-N. kube-scheduler is FIFO-over-fit, no reservation for Pending
@@ -19,10 +37,36 @@
     memory: "8Gi"
   limits:
     cpu: "8"
-    memory: "16Gi"
+    memory: "32Gi"
+
+.env: &env
+  - name: HF_HOME
+    value: /hf-cache
+  # Without this, xCCL's PCIe topology check stalls TP>=4 right after init
+  # (workers spin at 100% CPU, no output). Verified on the 8x B70 worker.
+  - name: CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK
+    value: "0"
+
+.volumes: &volumes
+  # Default /dev/shm in a k8s Pod is 64 MiB; vLLM's TP
+  # shm_broadcast needs ~160 MiB. 1 GiB is comfy.
+  - name: dshm
+    emptyDir:
+      medium: Memory
+      sizeLimit: 1Gi
+  - name: hf-cache
+    hostPath:
+      path: /var/lib/hf-cache
+      type: DirectoryOrCreate
+
+.mounts: &mounts
+  - name: dshm
+    mountPath: /dev/shm
+  - name: hf-cache
+    mountPath: /hf-cache
 
 steps:
-  - label: ":video_game: 1-GPU: opt-125m"
+  - label: ":video_game: 1-GPU: Qwen3-8B bench"
     key: gpu-1
     agents:
       queue: intel-xpu
@@ -30,32 +74,26 @@ steps:
       - |
         set -eu
         /opt/venv/bin/python3 -c "import torch; print('xpu count:', torch.xpu.device_count()); [print(f'  xpu:{i}: {torch.xpu.get_device_name(i)}') for i in range(torch.xpu.device_count())]"
-        /opt/venv/bin/python3 "$BUILDKITE_BUILD_CHECKOUT_PATH/examples/basic/offline_inference/generate.py" \
-          --model facebook/opt-125m --block-size 64 --enforce-eager
+        /opt/venv/bin/vllm bench throughput --model Qwen/Qwen3-8B \
+          --input-len 1024 --output-len 256 --num-prompts 320 \
+          --max-model-len 2048 --block-size 64 --enforce-eager
     plugins:
       - kubernetes:
           podSpec:
-            volumes:
-              # Default /dev/shm in a k8s Pod is 64 MiB; vLLM's TP
-              # shm_broadcast needs ~160 MiB. 1 GiB is comfy.
-              - name: dshm
-                emptyDir:
-                  medium: Memory
-                  sizeLimit: 1Gi
+            volumes: *volumes
             resourceClaims:
               - name: gpu
                 resourceClaimTemplateName: intel-gpu-1
             containers:
               - image: *image
+                env: *env
                 resources:
                   <<: *resources
                   claims:
                     - name: gpu
-                volumeMounts:
-                  - name: dshm
-                    mountPath: /dev/shm
+                volumeMounts: *mounts
 
-  - label: ":video_game::video_game: 2-GPU: opt-125m --tp 2"
+  - label: ":video_game::video_game: 2-GPU: Qwen3-8B bench --tp 2"
     key: gpu-2
     agents:
       queue: intel-xpu
@@ -63,67 +101,55 @@ steps:
       - |
         set -eu
         /opt/venv/bin/python3 -c "import torch; print('xpu count:', torch.xpu.device_count()); [print(f'  xpu:{i}: {torch.xpu.get_device_name(i)}') for i in range(torch.xpu.device_count())]"
-        /opt/venv/bin/python3 "$BUILDKITE_BUILD_CHECKOUT_PATH/examples/basic/offline_inference/generate.py" \
-          --model facebook/opt-125m --block-size 64 --enforce-eager \
+        /opt/venv/bin/vllm bench throughput --model Qwen/Qwen3-8B \
+          --input-len 1024 --output-len 256 --num-prompts 512 \
+          --max-model-len 2048 --block-size 64 --enforce-eager \
           -tp 2 --distributed-executor-backend mp
     plugins:
       - kubernetes:
           podSpec:
-            volumes:
-              # Default /dev/shm in a k8s Pod is 64 MiB; vLLM's TP
-              # shm_broadcast needs ~160 MiB. 1 GiB is comfy.
-              - name: dshm
-                emptyDir:
-                  medium: Memory
-                  sizeLimit: 1Gi
+            volumes: *volumes
             resourceClaims:
               - name: gpu
                 resourceClaimTemplateName: intel-gpu-2
             containers:
               - image: *image
+                env: *env
                 resources:
                   <<: *resources
                   claims:
                     - name: gpu
-                volumeMounts:
-                  - name: dshm
-                    mountPath: /dev/shm
+                volumeMounts: *mounts
 
-  - label: ":video_game::video_game::video_game::video_game: 4-GPU: enumerate only"
+  - label: ":video_game::video_game::video_game::video_game: 4-GPU: Qwen3-8B bench --tp 4"
     key: gpu-4
     agents:
       queue: intel-xpu
     commands:
       - |
         set -eu
-        # TP > 2 needs a model with head-count divisible by N; opt-125m has 12.
-        # First iteration just proves DRA attaches 4 devices. Swap in a
-        # 16-head or 32-head model (opt-350m, Qwen etc.) for actual TP perf.
         /opt/venv/bin/python3 -c "import torch; print('xpu count:', torch.xpu.device_count()); [print(f'  xpu:{i}: {torch.xpu.get_device_name(i)}') for i in range(torch.xpu.device_count())]"
+        /opt/venv/bin/vllm bench throughput --model Qwen/Qwen3-8B \
+          --input-len 1024 --output-len 256 --num-prompts 128 \
+          --max-model-len 2048 --block-size 64 --enforce-eager \
+          -tp 4 --distributed-executor-backend mp
     plugins:
       - kubernetes:
           podSpec:
-            volumes:
-              # Default /dev/shm in a k8s Pod is 64 MiB; vLLM's TP
-              # shm_broadcast needs ~160 MiB. 1 GiB is comfy.
-              - name: dshm
-                emptyDir:
-                  medium: Memory
-                  sizeLimit: 1Gi
+            volumes: *volumes
             resourceClaims:
               - name: gpu
                 resourceClaimTemplateName: intel-gpu-4
             containers:
               - image: *image
+                env: *env
                 resources:
                   <<: *resources
                   claims:
                     - name: gpu
-                volumeMounts:
-                  - name: dshm
-                    mountPath: /dev/shm
+                volumeMounts: *mounts
 
-  - label: ":video_game: x8: all 8 GPUs: enumerate only"
+  - label: ":video_game: x8: all 8 GPUs: Qwen3-8B bench --tp 8"
     key: gpu-8
     agents:
       queue: intel-xpu
@@ -131,25 +157,22 @@ steps:
       - |
         set -eu
         /opt/venv/bin/python3 -c "import torch; print('xpu count:', torch.xpu.device_count()); [print(f'  xpu:{i}: {torch.xpu.get_device_name(i)}') for i in range(torch.xpu.device_count())]"
+        /opt/venv/bin/vllm bench throughput --model Qwen/Qwen3-8B \
+          --input-len 1024 --output-len 256 --num-prompts 96 \
+          --max-model-len 2048 --block-size 64 --enforce-eager \
+          -tp 8 --distributed-executor-backend mp
     plugins:
       - kubernetes:
           podSpec:
-            volumes:
-              # Default /dev/shm in a k8s Pod is 64 MiB; vLLM's TP
-              # shm_broadcast needs ~160 MiB. 1 GiB is comfy.
-              - name: dshm
-                emptyDir:
-                  medium: Memory
-                  sizeLimit: 1Gi
+            volumes: *volumes
             resourceClaims:
               - name: gpu
                 resourceClaimTemplateName: intel-gpu-8
             containers:
               - image: *image
+                env: *env
                 resources:
                   <<: *resources
                   claims:
                     - name: gpu
-                volumeMounts:
-                  - name: dshm
-                    mountPath: /dev/shm
+                volumeMounts: *mounts
