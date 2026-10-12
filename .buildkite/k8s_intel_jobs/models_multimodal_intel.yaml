@@ -1,0 +1,178 @@
+# Kubernetes-native port of .buildkite/intel_jobs/models_multimodal_intel.yaml.
+#
+# Same tests and timeouts as upstream; only the runner changes. Instead of
+# run-intel-test.sh doing `docker run --privileged` on a bare-metal agent,
+# each step is a Pod on the vllm-ci cluster:
+#   - image: upstream's image-build-xpu output (${VLLM_XPU_IMAGE}, resolved by
+#     upload.sh); nothing is built here
+#   - GPUs: DRA ResourceClaimTemplate b70-<N> (upstream `gpu: N+` agent tag),
+#     so the Pod only sees its own GPUs and ZE_AFFINITY_MASK is unnecessary
+#   - admission: Kueue LocalQueue vllm-ci/ci-b70
+#
+# agent-stack-k8s mounts an emptyDir at /workspace in every container, which
+# hides the image's /workspace/vllm (the source tree tests run from, and the
+# editable install of tests/vllm_test_utils). The copy-vllm-src init
+# container copies it out of the image into that emptyDir first, so the
+# tests see the same tree as upstream. No git checkout is needed, but the
+# bootstrap still cd's to the (empty) checkout dir, so commands cd to
+# /workspace/vllm explicitly. They run under the image's /bin/sh (dash) with
+# -e; BUILDKITE_SHELL is a protected var, so wrap bashisms in `bash -c`.
+#
+# Deviations: upstream Standard 3 is missing `&&` before test_qwen2_vl.py
+# (folds into one bogus pytest call); here it runs as its own command.
+# Upstream's `optional: true` (Extended Generation 1) is a generator-only
+# field, so it is dropped and the step always runs.
+#
+# Env mirrors what run-intel-test.sh sets for the container.
+
+.env: &env
+  VLLM_TEST_DEVICE: "xpu"
+  PYTHONPATH: ".."
+  # Remove once intel/intel-xpu-backend-for-triton#7682 is fixed (upstream).
+  VLLM_DISABLE_COMPILE_CACHE: "1"
+
+.k8s-1gpu: &k8s-1gpu
+  checkout:
+    skip: true
+  metadata: &k8s-metadata
+    labels:
+      kueue.x-k8s.io/queue-name: ci-b70
+      kueue.x-k8s.io/priority-class: priority-normal
+  podSpec:
+    resourceClaims:
+      - name: gpu
+        resourceClaimTemplateName: b70-1
+    # Only used when upload.sh points VLLM_XPU_IMAGE at the private ghcr mirror.
+    imagePullSecrets: &pull-secrets
+      - name: ghcr-push
+    initContainers: &init-containers
+      - name: copy-vllm-src
+        image: ${VLLM_XPU_IMAGE}
+        command: ["cp", "-a", "/workspace/vllm", "/mnt/workspace/"]
+        volumeMounts:
+          - name: workspace
+            mountPath: /mnt/workspace
+    containers: &containers
+      - image: ${VLLM_XPU_IMAGE}
+        workingDir: /workspace/vllm
+        resources:
+          claims:
+            - name: gpu
+          requests:
+            cpu: "8"
+            memory: "32Gi"
+          limits:
+            cpu: "32"
+            memory: "64Gi"
+        volumeMounts:
+          # Upstream runs with --ipc=host; the Pod default /dev/shm is 64 MiB.
+          - name: dshm
+            mountPath: /dev/shm
+          # Upstream mounts /data/huggingface here; node-local cache on the worker.
+          - name: hf-cache
+            mountPath: /root/.cache/huggingface
+    volumes: &volumes
+      - name: dshm
+        emptyDir:
+          medium: Memory
+          sizeLimit: 8Gi
+      - name: hf-cache
+        hostPath:
+          path: /var/lib/hf-cache
+          type: DirectoryOrCreate
+
+# Upstream `gpu: 2+`: same Pod, two B70s.
+.k8s-2gpu: &k8s-2gpu
+  checkout:
+    skip: true
+  metadata: *k8s-metadata
+  podSpec:
+    resourceClaims:
+      - name: gpu
+        resourceClaimTemplateName: b70-2
+    imagePullSecrets: *pull-secrets
+    initContainers: *init-containers
+    containers: *containers
+    volumes: *volumes
+
+steps:
+  - group: Models - Multimodal
+    key: models-multimodal-intel
+    steps:
+    - label: "Multi-Modal Models (Standard) 1: qwen2"
+      key: multi-modal-models-standard-1-qwen2
+      timeout_in_minutes: 70
+      agents:
+        queue: intel-b70
+      env: *env
+      commands:
+        - cd /workspace/vllm/tests
+        - pytest -v -s models/multimodal/generation/test_common.py -m core_model -k "qwen2"
+        - pytest -v -s models/multimodal/generation/test_ultravox.py -m core_model
+      plugins:
+        - kubernetes: *k8s-1gpu
+
+    - label: "Multi-Modal Models (Standard) 2: qwen3 + gemma"
+      key: multi-modal-models-standard-2-qwen3-gemma
+      timeout_in_minutes: 90
+      agents:
+        queue: intel-b70
+      env: *env
+      commands:
+        - cd /workspace/vllm/tests
+        - pytest -v -s models/multimodal/generation/test_common.py -m core_model -k "qwen3 or gemma"
+        - pytest -v -s models/multimodal/generation/test_mm_prefix_lm.py -m core_model
+        - pytest -v -s models/multimodal/generation/test_qwen2_5_vl.py -m core_model
+      plugins:
+        - kubernetes: *k8s-1gpu
+
+    - label: "Multi-Modal Models (Standard) 3: llava + qwen2_vl"
+      key: multi-modal-models-standard-3-llava-qwen2-vl
+      timeout_in_minutes: 65
+      agents:
+        queue: intel-b70
+      env: *env
+      commands:
+        - cd /workspace/vllm/tests
+        - pytest -v -s models/multimodal/generation/test_common.py -m core_model -k "not qwen2 and not qwen3 and not gemma"
+        - pytest -v -s models/multimodal/generation/test_gemma_ragged_audio.py -m core_model
+        - pytest -v -s models/multimodal/generation/test_qwen2_vl.py -m core_model
+      plugins:
+        - kubernetes: *k8s-1gpu
+
+    - label: "Multi-Modal Models (Standard) 4: other + whisper"
+      key: multi-modal-models-standard-4-other-whisper
+      timeout_in_minutes: 45
+      agents:
+        queue: intel-b70
+      env: *env
+      commands:
+        - cd /workspace/vllm/tests
+        - pytest -v -s models/multimodal -m core_model --ignore models/multimodal/generation/test_common.py --ignore models/multimodal/generation/test_ultravox.py --ignore models/multimodal/generation/test_qwen2_5_vl.py --ignore models/multimodal/generation/test_qwen2_vl.py --ignore models/multimodal/generation/test_whisper.py --ignore models/multimodal/generation/test_gemma_ragged_audio.py --ignore models/multimodal/generation/test_memory_leak.py --ignore models/multimodal/processing
+      plugins:
+        - kubernetes: *k8s-1gpu
+
+    - label: "Multi-Modal Processor"
+      key: multi-modal-processor
+      timeout_in_minutes: 60
+      parallelism: 4
+      agents:
+        queue: intel-b70
+      env: *env
+      commands:
+        - cd /workspace/vllm/tests
+        - pytest -v -s models/multimodal/processing/test_tensor_schema.py --deselect="tests/models/multimodal/processing/test_tensor_schema.py::test_model_tensor_schema[deepseek-ai/DeepSeek-V4.1-Flash]" --num-shards=$$BUILDKITE_PARALLEL_JOB_COUNT --shard-id=$$BUILDKITE_PARALLEL_JOB
+      plugins:
+        - kubernetes: *k8s-1gpu
+
+    - label: "Multi-Modal Models (Extended Generation 1)"
+      key: multi-modal-models-extended-generation-1
+      timeout_in_minutes: 60
+      agents:
+        queue: intel-b70
+      env: *env
+      commands:
+        - cd /workspace/vllm/tests
+        - pytest -v -s models/multimodal/test_mapping.py
+      plugins:
+        - kubernetes: *k8s-1gpu
