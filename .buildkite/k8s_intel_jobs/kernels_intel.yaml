@@ -36,6 +36,9 @@
     resourceClaims:
       - name: gpu
         resourceClaimTemplateName: b70-1
+    # Only used when upload.sh points VLLM_XPU_IMAGE at the private ghcr mirror.
+    imagePullSecrets:
+      - name: ghcr-push
     initContainers:
       - name: copy-vllm-src
         image: ${VLLM_XPU_IMAGE}

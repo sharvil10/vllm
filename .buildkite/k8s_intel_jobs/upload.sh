@@ -13,6 +13,11 @@
 #
 # Needs enough history to walk back: the upload step clones with --depth=100.
 #
+# VLLM_IMAGE_MIRROR (e.g. ghcr.io/sharvil10/vllm-ci-test-repo) makes the Pods
+# pull <mirror>:<sha>-xpu instead. The cluster's NAT IP can hit ECR Public's
+# anonymous "Data limit exceeded" (429) on blob pulls; the image still has to
+# exist upstream, and has to be copied to the mirror out of band.
+#
 # Exports VLLM_XPU_IMAGE / VLLM_COMMIT and uploads each *_intel.yaml in this
 # directory (or just the space-separated files in K8S_INTEL_JOBS).
 set -euo pipefail
@@ -57,7 +62,7 @@ else
 fi
 
 export VLLM_COMMIT
-export VLLM_XPU_IMAGE="${REGISTRY}/${REPO}:${VLLM_COMMIT}-xpu"
+export VLLM_XPU_IMAGE="${VLLM_IMAGE_MIRROR:-${REGISTRY}/${REPO}}:${VLLM_COMMIT}-xpu"
 echo "Testing upstream commit ${VLLM_COMMIT}"
 echo "Image: ${VLLM_XPU_IMAGE}"
 
