@@ -43,8 +43,10 @@ Rules that bite:
 - Every `$` in commands is interpolated at upload time, so use `$$VAR` for
   runtime variables.
 - TP>=4 on these PCIe-only B70s needs `CCL_TOPO_FABRIC_VERTEX_CONNECTION_CHECK=0`.
-- No `HF_TOKEN` secret exists in `vllm-ci` yet, so gated HF models fail. The HF
-  cache is the node-local hostPath `/var/lib/hf-cache`.
+- `HF_TOKEN` comes from Secret `vllm-ci/hf-token` (created out of band, not in
+  git) through the container `env` in the pod template, which gives access to
+  gated meta-llama models. The HF cache is the node-local hostPath
+  `/var/lib/hf-cache`.
 - Name files `<stem>_intel.yaml` so the upload glob picks them up.
 
 Test one file in isolation from a `k8s-ci-<name>` branch:
