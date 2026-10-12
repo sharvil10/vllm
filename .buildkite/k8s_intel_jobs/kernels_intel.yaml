@@ -1,0 +1,102 @@
+# Kubernetes-native port of .buildkite/intel_jobs/kernels_intel.yaml.
+#
+# Same tests and timeouts as upstream; only the runner changes. Instead of
+# run-intel-test.sh doing `docker run --privileged` on a bare-metal agent,
+# each step is a Pod on the vllm-ci cluster:
+#   - image: upstream's image-build-xpu output (${VLLM_XPU_IMAGE}, resolved by
+#     upload.sh); nothing is built here
+#   - GPUs: DRA ResourceClaimTemplate b70-<N> (upstream `gpu: N+` agent tag),
+#     so the Pod only sees its own GPUs and ZE_AFFINITY_MASK is unnecessary
+#   - admission: Kueue LocalQueue vllm-ci/ci-b70
+#
+# agent-stack-k8s mounts an emptyDir at /workspace in every container, which
+# hides the image's /workspace/vllm (the source tree tests run from, and the
+# editable install of tests/vllm_test_utils). The copy-vllm-src init
+# container copies it out of the image into that emptyDir first, so the
+# tests see the same tree as upstream. No git checkout is needed.
+#
+# Env mirrors what run-intel-test.sh sets for the container.
+
+.env: &env
+  VLLM_TEST_DEVICE: "xpu"
+  PYTHONPATH: ".."
+  # Remove once intel/intel-xpu-backend-for-triton#7682 is fixed (upstream).
+  VLLM_DISABLE_COMPILE_CACHE: "1"
+  # Image /bin/sh is dash.
+  BUILDKITE_SHELL: "/bin/bash -e -o pipefail -c"
+
+.k8s-1gpu: &k8s-1gpu
+  checkout:
+    skip: true
+  metadata:
+    labels:
+      kueue.x-k8s.io/queue-name: ci-b70
+      kueue.x-k8s.io/priority-class: priority-normal
+  podSpec:
+    resourceClaims:
+      - name: gpu
+        resourceClaimTemplateName: b70-1
+    initContainers:
+      - name: copy-vllm-src
+        image: ${VLLM_XPU_IMAGE}
+        command: ["cp", "-a", "/workspace/vllm", "/mnt/workspace/"]
+        volumeMounts:
+          - name: workspace
+            mountPath: /mnt/workspace
+    containers:
+      - image: ${VLLM_XPU_IMAGE}
+        workingDir: /workspace/vllm
+        resources:
+          claims:
+            - name: gpu
+          requests:
+            cpu: "8"
+            memory: "32Gi"
+          limits:
+            cpu: "32"
+            memory: "64Gi"
+        volumeMounts:
+          # Upstream runs with --ipc=host; the Pod default /dev/shm is 64 MiB.
+          - name: dshm
+            mountPath: /dev/shm
+          # Upstream mounts /data/huggingface here; node-local cache on the worker.
+          - name: hf-cache
+            mountPath: /root/.cache/huggingface
+    volumes:
+      - name: dshm
+        emptyDir:
+          medium: Memory
+          sizeLimit: 8Gi
+      - name: hf-cache
+        hostPath:
+          path: /var/lib/hf-cache
+          type: DirectoryOrCreate
+
+steps:
+  - group: Kernels Intel
+    key: kernels-intel
+    steps:
+    - label: vLLM IR Tests
+      key: vllm-ir-tests
+      timeout_in_minutes: 30
+      agents:
+        queue: intel-b70
+      env: *env
+      commands:
+        - cd tests
+        - pytest -v -s ir
+        - pytest -v -s kernels/ir
+      plugins:
+        - kubernetes: *k8s-1gpu
+
+    - label: UVA Kernel Tests
+      key: uva-kernel-tests
+      timeout_in_minutes: 20
+      agents:
+        queue: intel-b70
+      env: *env
+      commands:
+        - cd tests
+        - pytest -v -s kernels/core/test_uva.py
+      plugins:
+        - kubernetes: *k8s-1gpu
