@@ -1,0 +1,95 @@
+# Kubernetes-native port of .buildkite/intel_jobs/model_executor_intel.yaml.
+#
+# Same tests and timeouts as upstream; see README.md for the conversion rules
+# and kernels_intel.yaml for why the pod spec looks the way it does
+# (copy-vllm-src init container, explicit cd, dash shell).
+
+.env: &env
+  VLLM_TEST_DEVICE: "xpu"
+  PYTHONPATH: ".."
+  # Remove once intel/intel-xpu-backend-for-triton#7682 is fixed (upstream).
+  VLLM_DISABLE_COMPILE_CACHE: "1"
+
+.k8s-1gpu: &k8s-1gpu
+  checkout:
+    skip: true
+  metadata:
+    labels:
+      kueue.x-k8s.io/queue-name: ci-b70
+      kueue.x-k8s.io/priority-class: priority-normal
+  podSpec:
+    resourceClaims:
+      - name: gpu
+        resourceClaimTemplateName: b70-1
+    # Only used when upload.sh points VLLM_XPU_IMAGE at the private ghcr mirror.
+    imagePullSecrets:
+      - name: ghcr-push
+    initContainers:
+      - name: copy-vllm-src
+        image: ${VLLM_XPU_IMAGE}
+        command: ["cp", "-a", "/workspace/vllm", "/mnt/workspace/"]
+        volumeMounts:
+          - name: workspace
+            mountPath: /mnt/workspace
+    containers:
+      - image: ${VLLM_XPU_IMAGE}
+        workingDir: /workspace/vllm
+        resources:
+          claims:
+            - name: gpu
+          requests:
+            cpu: "8"
+            memory: "32Gi"
+          limits:
+            cpu: "32"
+            memory: "64Gi"
+        volumeMounts:
+          # Upstream runs with --ipc=host; the Pod default /dev/shm is 64 MiB.
+          - name: dshm
+            mountPath: /dev/shm
+          # Upstream mounts /data/huggingface here; node-local cache on the worker.
+          - name: hf-cache
+            mountPath: /root/.cache/huggingface
+    volumes:
+      - name: dshm
+        emptyDir:
+          medium: Memory
+          sizeLimit: 8Gi
+      - name: hf-cache
+        hostPath:
+          path: /var/lib/hf-cache
+          type: DirectoryOrCreate
+
+steps:
+  - group: Model Executor Intel
+    key: model-executor-intel-group
+    steps:
+    - label: Model Executor (Intel)
+      key: model-executor-intel
+      timeout_in_minutes: 45
+      agents:
+        queue: intel-b70
+      env: *env
+      commands:
+        - apt-get update && apt-get install -y curl libsodium23
+        - export VLLM_WORKER_MULTIPROC_METHOD=spawn
+        - export PYTHONFAULTHANDLER=1
+        - cd /workspace/vllm/tests
+        - pytest -v -s model_executor -m "not slow_test" --ignore="model_executor/layers/test_rocm_unquantized_gemm.py" --ignore="model_executor/model_loader/tensorizer_loader/test_tensorizer.py" --deselect="tests/model_executor/model_loader/test_reload.py::test_kv_scale_reload"
+      plugins:
+        - kubernetes: *k8s-1gpu
+
+    - label: Tensorizer Model Loader Tests (XPU)
+      key: tensorizer-model-loader-tests-xpu
+      timeout_in_minutes: 45
+      agents:
+        queue: intel-b70
+      env: *env
+      commands:
+        - apt-get update && apt-get install -y curl libsodium23
+        - export VLLM_WORKER_MULTIPROC_METHOD=spawn
+        - export PYTHONFAULTHANDLER=1
+        - cd /workspace/vllm/tests
+        - pytest -v -s model_executor/model_loader/tensorizer_loader/test_tensorizer.py -m "not slow_test"
+      plugins:
+        - kubernetes: *k8s-1gpu

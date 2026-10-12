@@ -1,0 +1,144 @@
+# Kubernetes-native port of .buildkite/intel_jobs/lm_eval_intel.yaml.
+#
+# Same tests and timeouts as upstream; see README.md for the conversion rules
+# and kernels_intel.yaml for why the pod spec looks the way it does
+# (copy-vllm-src init container, explicit cd, dash shell).
+#
+# Upstream marks "LM Eval Large Models(2 GPUs)" `optional: true` (a field
+# for upstream's generator, not Buildkite); here it is soft_fail instead.
+
+.env: &env
+  VLLM_TEST_DEVICE: "xpu"
+  PYTHONPATH: ".."
+  # Remove once intel/intel-xpu-backend-for-triton#7682 is fixed (upstream).
+  VLLM_DISABLE_COMPILE_CACHE: "1"
+
+.k8s-1gpu: &k8s-1gpu
+  checkout:
+    skip: true
+  metadata:
+    labels:
+      kueue.x-k8s.io/queue-name: ci-b70
+      kueue.x-k8s.io/priority-class: priority-normal
+  podSpec:
+    resourceClaims:
+      - name: gpu
+        resourceClaimTemplateName: b70-1
+    # Only used when upload.sh points VLLM_XPU_IMAGE at the private ghcr mirror.
+    imagePullSecrets:
+      - name: ghcr-push
+    initContainers:
+      - name: copy-vllm-src
+        image: ${VLLM_XPU_IMAGE}
+        command: ["cp", "-a", "/workspace/vllm", "/mnt/workspace/"]
+        volumeMounts:
+          - name: workspace
+            mountPath: /mnt/workspace
+    containers:
+      - image: ${VLLM_XPU_IMAGE}
+        workingDir: /workspace/vllm
+        resources:
+          claims:
+            - name: gpu
+          requests:
+            cpu: "8"
+            memory: "32Gi"
+          limits:
+            cpu: "32"
+            memory: "64Gi"
+        volumeMounts:
+          # Upstream runs with --ipc=host; the Pod default /dev/shm is 64 MiB.
+          - name: dshm
+            mountPath: /dev/shm
+          # Upstream mounts /data/huggingface here; node-local cache on the worker.
+          - name: hf-cache
+            mountPath: /root/.cache/huggingface
+    volumes:
+      - name: dshm
+        emptyDir:
+          medium: Memory
+          sizeLimit: 8Gi
+      - name: hf-cache
+        hostPath:
+          path: /var/lib/hf-cache
+          type: DirectoryOrCreate
+
+.k8s-2gpu: &k8s-2gpu
+  checkout:
+    skip: true
+  metadata:
+    labels:
+      kueue.x-k8s.io/queue-name: ci-b70
+      kueue.x-k8s.io/priority-class: priority-normal
+  podSpec:
+    resourceClaims:
+      - name: gpu
+        resourceClaimTemplateName: b70-2
+    # Only used when upload.sh points VLLM_XPU_IMAGE at the private ghcr mirror.
+    imagePullSecrets:
+      - name: ghcr-push
+    initContainers:
+      - name: copy-vllm-src
+        image: ${VLLM_XPU_IMAGE}
+        command: ["cp", "-a", "/workspace/vllm", "/mnt/workspace/"]
+        volumeMounts:
+          - name: workspace
+            mountPath: /mnt/workspace
+    containers:
+      - image: ${VLLM_XPU_IMAGE}
+        workingDir: /workspace/vllm
+        resources:
+          claims:
+            - name: gpu
+          requests:
+            cpu: "8"
+            memory: "32Gi"
+          limits:
+            cpu: "32"
+            memory: "64Gi"
+        volumeMounts:
+          # Upstream runs with --ipc=host; the Pod default /dev/shm is 64 MiB.
+          - name: dshm
+            mountPath: /dev/shm
+          # Upstream mounts /data/huggingface here; node-local cache on the worker.
+          - name: hf-cache
+            mountPath: /root/.cache/huggingface
+    volumes:
+      - name: dshm
+        emptyDir:
+          medium: Memory
+          sizeLimit: 8Gi
+      - name: hf-cache
+        hostPath:
+          path: /var/lib/hf-cache
+          type: DirectoryOrCreate
+
+steps:
+  - group: LM Eval
+    key: lm-eval-intel
+    steps:
+    - label: "XPU GPQA Eval (GPT-OSS)"
+      key: xpu-gpqa-eval-gpt-oss
+      timeout_in_minutes: 60
+      agents:
+        queue: intel-b70
+      env: *env
+      commands:
+        - cd /workspace/vllm/tests
+        - pytest -s -v evals/gpt_oss/test_gpqa_correctness.py --config-list-file=configs/models-xpu.txt
+      plugins:
+        - kubernetes: *k8s-1gpu
+
+    - label: LM Eval Large Models(2 GPUs)
+      key: lm-eval-large-models-2-gpus
+      timeout_in_minutes: 45
+      soft_fail: true
+      agents:
+        queue: intel-b70
+      env: *env
+      commands:
+        - cd /workspace/vllm/.buildkite/lm-eval-harness
+        - export VLLM_USE_DEEP_GEMM=0
+        - pytest -s -v test_lm_eval_correctness.py --config-list-file=configs/models-large-xpu-fp8.txt --tp-size=2
+      plugins:
+        - kubernetes: *k8s-2gpu

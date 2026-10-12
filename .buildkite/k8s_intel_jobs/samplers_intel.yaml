@@ -1,0 +1,89 @@
+# Kubernetes-native port of .buildkite/intel_jobs/samplers_intel.yaml.
+#
+# Same tests and timeouts as upstream; see README.md for the conversion rules
+# and kernels_intel.yaml for why the pod spec looks the way it does
+# (copy-vllm-src init container, explicit cd, dash shell).
+
+.env: &env
+  VLLM_TEST_DEVICE: "xpu"
+  PYTHONPATH: ".."
+  # Remove once intel/intel-xpu-backend-for-triton#7682 is fixed (upstream).
+  VLLM_DISABLE_COMPILE_CACHE: "1"
+
+.k8s-1gpu: &k8s-1gpu
+  checkout:
+    skip: true
+  metadata:
+    labels:
+      kueue.x-k8s.io/queue-name: ci-b70
+      kueue.x-k8s.io/priority-class: priority-normal
+  podSpec:
+    resourceClaims:
+      - name: gpu
+        resourceClaimTemplateName: b70-1
+    # Only used when upload.sh points VLLM_XPU_IMAGE at the private ghcr mirror.
+    imagePullSecrets:
+      - name: ghcr-push
+    initContainers:
+      - name: copy-vllm-src
+        image: ${VLLM_XPU_IMAGE}
+        command: ["cp", "-a", "/workspace/vllm", "/mnt/workspace/"]
+        volumeMounts:
+          - name: workspace
+            mountPath: /mnt/workspace
+    containers:
+      - image: ${VLLM_XPU_IMAGE}
+        workingDir: /workspace/vllm
+        resources:
+          claims:
+            - name: gpu
+          requests:
+            cpu: "8"
+            memory: "32Gi"
+          limits:
+            cpu: "32"
+            memory: "64Gi"
+        volumeMounts:
+          # Upstream runs with --ipc=host; the Pod default /dev/shm is 64 MiB.
+          - name: dshm
+            mountPath: /dev/shm
+          # Upstream mounts /data/huggingface here; node-local cache on the worker.
+          - name: hf-cache
+            mountPath: /root/.cache/huggingface
+    volumes:
+      - name: dshm
+        emptyDir:
+          medium: Memory
+          sizeLimit: 8Gi
+      - name: hf-cache
+        hostPath:
+          path: /var/lib/hf-cache
+          type: DirectoryOrCreate
+
+steps:
+  - group: Samplers Intel
+    key: samplers-intel
+    steps:
+    - label: Samplers Test (XPU Kernel)
+      key: samplers-test-xpu-kernel-intel
+      timeout_in_minutes: 40
+      agents:
+        queue: intel-b70
+      env: *env
+      commands:
+        - cd /workspace/vllm/tests
+        - VLLM_XPU_USE_SAMPLER_KERNEL=1 pytest -v -s samplers --ignore=samplers/test_beam_search.py
+      plugins:
+        - kubernetes: *k8s-1gpu
+
+    - label: Samplers Beam Search Test (XPU Kernel)
+      key: samplers-beam-search-test-xpu-kernel-intel
+      timeout_in_minutes: 40
+      agents:
+        queue: intel-b70
+      env: *env
+      commands:
+        - cd /workspace/vllm/tests
+        - VLLM_XPU_USE_SAMPLER_KERNEL=1 pytest -v -s samplers/test_beam_search.py
+      plugins:
+        - kubernetes: *k8s-1gpu
