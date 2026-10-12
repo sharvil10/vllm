@@ -13,7 +13,10 @@
 # hides the image's /workspace/vllm (the source tree tests run from, and the
 # editable install of tests/vllm_test_utils). The copy-vllm-src init
 # container copies it out of the image into that emptyDir first, so the
-# tests see the same tree as upstream. No git checkout is needed.
+# tests see the same tree as upstream. No git checkout is needed, but the
+# bootstrap still cd's to the (empty) checkout dir, so commands cd to
+# /workspace/vllm explicitly. They run under the image's /bin/sh (dash) with
+# -e; BUILDKITE_SHELL is a protected var, so wrap bashisms in `bash -c`.
 #
 # Env mirrors what run-intel-test.sh sets for the container.
 
@@ -22,8 +25,6 @@
   PYTHONPATH: ".."
   # Remove once intel/intel-xpu-backend-for-triton#7682 is fixed (upstream).
   VLLM_DISABLE_COMPILE_CACHE: "1"
-  # Image /bin/sh is dash.
-  BUILDKITE_SHELL: "/bin/bash -e -o pipefail -c"
 
 .k8s-1gpu: &k8s-1gpu
   checkout:
@@ -86,7 +87,7 @@ steps:
         queue: intel-b70
       env: *env
       commands:
-        - cd tests
+        - cd /workspace/vllm/tests
         - pytest -v -s ir
         - pytest -v -s kernels/ir
       plugins:
@@ -99,7 +100,7 @@ steps:
         queue: intel-b70
       env: *env
       commands:
-        - cd tests
+        - cd /workspace/vllm/tests
         - pytest -v -s kernels/core/test_uva.py
       plugins:
         - kubernetes: *k8s-1gpu
