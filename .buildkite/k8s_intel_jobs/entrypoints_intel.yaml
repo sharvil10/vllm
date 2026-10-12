@@ -1,0 +1,165 @@
+# Kubernetes-native port of .buildkite/intel_jobs/entrypoints_intel.yaml.
+#
+# Same tests and timeouts as upstream; runner differences (image, DRA GPUs,
+# Kueue, copy-vllm-src init container, explicit cd) are described in
+# kernels_intel.yaml and README.md. Upstream `optional: true` (a generator
+# field) is mapped to `soft_fail: true`.
+
+.env: &env
+  VLLM_TEST_DEVICE: "xpu"
+  PYTHONPATH: ".."
+  # Remove once intel/intel-xpu-backend-for-triton#7682 is fixed (upstream).
+  VLLM_DISABLE_COMPILE_CACHE: "1"
+
+.k8s-1gpu: &k8s-1gpu
+  checkout:
+    skip: true
+  metadata:
+    labels:
+      kueue.x-k8s.io/queue-name: ci-b70
+      kueue.x-k8s.io/priority-class: priority-normal
+  podSpec:
+    resourceClaims:
+      - name: gpu
+        resourceClaimTemplateName: b70-1
+    # Only used when upload.sh points VLLM_XPU_IMAGE at the private ghcr mirror.
+    imagePullSecrets:
+      - name: ghcr-push
+    initContainers:
+      - name: copy-vllm-src
+        image: ${VLLM_XPU_IMAGE}
+        command: ["cp", "-a", "/workspace/vllm", "/mnt/workspace/"]
+        volumeMounts:
+          - name: workspace
+            mountPath: /mnt/workspace
+    containers:
+      - image: ${VLLM_XPU_IMAGE}
+        workingDir: /workspace/vllm
+        resources:
+          claims:
+            - name: gpu
+          requests:
+            cpu: "8"
+            memory: "32Gi"
+          limits:
+            cpu: "32"
+            memory: "64Gi"
+        volumeMounts:
+          # Upstream runs with --ipc=host; the Pod default /dev/shm is 64 MiB.
+          - name: dshm
+            mountPath: /dev/shm
+          # Upstream mounts /data/huggingface here; node-local cache on the worker.
+          - name: hf-cache
+            mountPath: /root/.cache/huggingface
+    volumes:
+      - name: dshm
+        emptyDir:
+          medium: Memory
+          sizeLimit: 8Gi
+      - name: hf-cache
+        hostPath:
+          path: /var/lib/hf-cache
+          type: DirectoryOrCreate
+
+steps:
+  - group: Entrypoints
+    key: entrypoints-intel
+    steps:
+    - label: ":intel: (BMG) Entrypoints Unit"
+      key: entrypoints-unit-tests-intel
+      timeout_in_minutes: 45
+      agents:
+        queue: intel-b70
+      env: *env
+      commands:
+        - cd /workspace/vllm/tests
+        - pytest -v -s entrypoints/unit_tests
+        - pytest -v -s entrypoints/rl/weight_transfer
+      plugins:
+        - kubernetes: *k8s-1gpu
+
+    - label: ":intel: (BMG) Entrypoints Integration (LLM)"
+      key: entrypoints-integration-llm-intel
+      timeout_in_minutes: 70
+      agents:
+        queue: intel-b70
+      env: *env
+      commands:
+        - export VLLM_WORKER_MULTIPROC_METHOD=spawn
+        - cd /workspace/vllm/tests
+        - pytest -v -s entrypoints/llm/test_generate.py
+        - pytest -v -s entrypoints/llm/offline_mode
+      plugins:
+        - kubernetes: *k8s-1gpu
+
+    - label: ":intel: (BMG) Entrypoints Integration (API Server)"
+      key: entrypoints-integration-api-server-intel
+      timeout_in_minutes: 70
+      agents:
+        queue: intel-b70
+      env: *env
+      commands:
+        - export VLLM_WORKER_MULTIPROC_METHOD=spawn
+        - cd /workspace/vllm/tests
+        - pytest -v -s entrypoints/serve --ignore=entrypoints/serve/dev/rpc
+        - >-
+          pytest -v -s entrypoints/rl --ignore=entrypoints/rl/weight_transfer --ignore=entrypoints/rl/return_routed_experts/test_openai_api.py --ignore=entrypoints/rl/weight_transfer_metrics --deselect="tests/entrypoints/rl/state_transitions/test_pause_resume.py::TestPauseResume::test_clear_cache_preserves_output_and_controls_prefix_cache[MRV1]"
+        - PYTHONPATH=/workspace/vllm pytest -v -s entrypoints/serve/dev/rpc
+      plugins:
+        - kubernetes: *k8s-1gpu
+
+    - label: ":intel: (BMG) Entrypoints Integration (API Server Scale Out)"
+      key: entrypoints-integration-api-server-scale-out-intel
+      timeout_in_minutes: 40
+      agents:
+        queue: intel-b70
+      env: *env
+      commands:
+        - export VLLM_WORKER_MULTIPROC_METHOD=spawn
+        - cd /workspace/vllm/tests
+        - pytest -v -s entrypoints/scale_out
+      plugins:
+        - kubernetes: *k8s-1gpu
+
+    - label: ":intel: (BMG) Entrypoints Integration (API Server Generate)"
+      key: entrypoints-integration-api-server-generate-intel
+      timeout_in_minutes: 65
+      soft_fail: true
+      agents:
+        queue: intel-b70
+      env: *env
+      commands:
+        - cd /workspace/vllm/tests
+        - >-
+          pytest -v -s tool_use --deselect="tests/tool_use/mistral/test_mistral_tool_calls.py::test_tool_call_none_with_tools[ministral-3b]" --deselect="tests/tool_use/test_chat_completions.py::test_chat_completion_with_tools[granite-3.0-8b]" --deselect="tests/tool_use/test_chat_completions.py::test_chat_completion_with_tools[llama3.2]"
+        - pytest -v -s entrypoints/tool_parsers
+        - pytest -v -s entrypoints/generate
+        - pytest -v -s entrypoints/anthropic
+        - pytest -v -s entrypoints/cohere
+      plugins:
+        - kubernetes: *k8s-1gpu
+
+    - label: ":intel: (BMG) Entrypoints Integration (Responses API)"
+      key: entrypoints-integration-responses-api-intel
+      timeout_in_minutes: 60
+      soft_fail: true
+      agents:
+        queue: intel-b70
+      env: *env
+      commands:
+        - cd /workspace/vllm/tests
+        - pytest -v -s entrypoints/openai/responses
+      plugins:
+        - kubernetes: *k8s-1gpu
+
+    - label: ":intel: (BMG) OpenAI API Correctness"
+      key: openai-api-correctness-intel
+      timeout_in_minutes: 30
+      agents:
+        queue: intel-b70
+      env: *env
+      commands:
+        - cd /workspace/vllm/tests
+        - pytest -v -s entrypoints/openai/correctness/
+      plugins:
+        - kubernetes: *k8s-1gpu

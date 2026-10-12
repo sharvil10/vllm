@@ -1,0 +1,153 @@
+# Kubernetes-native port of .buildkite/intel_jobs/engine_intel.yaml.
+#
+# Same tests and timeouts as upstream; runner differences (image, DRA GPUs,
+# Kueue, copy-vllm-src init container, explicit cd) are described in
+# kernels_intel.yaml and README.md. Upstream `optional: true` (a generator
+# field) is mapped to `soft_fail: true`.
+
+.env: &env
+  VLLM_TEST_DEVICE: "xpu"
+  PYTHONPATH: ".."
+  # Remove once intel/intel-xpu-backend-for-triton#7682 is fixed (upstream).
+  VLLM_DISABLE_COMPILE_CACHE: "1"
+
+.k8s-1gpu: &k8s-1gpu
+  checkout:
+    skip: true
+  metadata:
+    labels:
+      kueue.x-k8s.io/queue-name: ci-b70
+      kueue.x-k8s.io/priority-class: priority-normal
+  podSpec:
+    resourceClaims:
+      - name: gpu
+        resourceClaimTemplateName: b70-1
+    # Only used when upload.sh points VLLM_XPU_IMAGE at the private ghcr mirror.
+    imagePullSecrets:
+      - name: ghcr-push
+    initContainers:
+      - name: copy-vllm-src
+        image: ${VLLM_XPU_IMAGE}
+        command: ["cp", "-a", "/workspace/vllm", "/mnt/workspace/"]
+        volumeMounts:
+          - name: workspace
+            mountPath: /mnt/workspace
+    containers:
+      - image: ${VLLM_XPU_IMAGE}
+        workingDir: /workspace/vllm
+        resources:
+          claims:
+            - name: gpu
+          requests:
+            cpu: "8"
+            memory: "32Gi"
+          limits:
+            cpu: "32"
+            memory: "64Gi"
+        volumeMounts:
+          # Upstream runs with --ipc=host; the Pod default /dev/shm is 64 MiB.
+          - name: dshm
+            mountPath: /dev/shm
+          # Upstream mounts /data/huggingface here; node-local cache on the worker.
+          - name: hf-cache
+            mountPath: /root/.cache/huggingface
+    volumes:
+      - name: dshm
+        emptyDir:
+          medium: Memory
+          sizeLimit: 8Gi
+      - name: hf-cache
+        hostPath:
+          path: /var/lib/hf-cache
+          type: DirectoryOrCreate
+
+.k8s-2gpu: &k8s-2gpu
+  checkout:
+    skip: true
+  metadata:
+    labels:
+      kueue.x-k8s.io/queue-name: ci-b70
+      kueue.x-k8s.io/priority-class: priority-normal
+  podSpec:
+    resourceClaims:
+      - name: gpu
+        resourceClaimTemplateName: b70-2
+    # Only used when upload.sh points VLLM_XPU_IMAGE at the private ghcr mirror.
+    imagePullSecrets:
+      - name: ghcr-push
+    initContainers:
+      - name: copy-vllm-src
+        image: ${VLLM_XPU_IMAGE}
+        command: ["cp", "-a", "/workspace/vllm", "/mnt/workspace/"]
+        volumeMounts:
+          - name: workspace
+            mountPath: /mnt/workspace
+    containers:
+      - image: ${VLLM_XPU_IMAGE}
+        workingDir: /workspace/vllm
+        resources:
+          claims:
+            - name: gpu
+          requests:
+            cpu: "8"
+            memory: "32Gi"
+          limits:
+            cpu: "32"
+            memory: "64Gi"
+        volumeMounts:
+          # Upstream runs with --ipc=host; the Pod default /dev/shm is 64 MiB.
+          - name: dshm
+            mountPath: /dev/shm
+          # Upstream mounts /data/huggingface here; node-local cache on the worker.
+          - name: hf-cache
+            mountPath: /root/.cache/huggingface
+    volumes:
+      - name: dshm
+        emptyDir:
+          medium: Memory
+          sizeLimit: 8Gi
+      - name: hf-cache
+        hostPath:
+          path: /var/lib/hf-cache
+          type: DirectoryOrCreate
+
+steps:
+  - group: Engine Intel
+    key: engine-intel
+    steps:
+    - label: "Engine"
+      key: engine
+      timeout_in_minutes: 40
+      agents:
+        queue: intel-b70
+      env: *env
+      commands:
+        - cd /workspace/vllm/tests
+        - pytest -v -s engine/test_arg_utils.py test_sequence.py test_logger.py test_vllm_port.py jit_monitor/test_hooks.py
+      plugins:
+        - kubernetes: *k8s-1gpu
+
+    - label: "Engine (1 GPU)"
+      key: engine-1-gpu
+      timeout_in_minutes: 30
+      agents:
+        queue: intel-b70
+      env: *env
+      commands:
+        - cd /workspace/vllm/tests
+        - pytest -v -s v1/engine --ignore v1/engine/test_preprocess_error_handling.py --ignore v1/engine/test_core_engine_actor_manager.py
+        - pytest -v -s test_config.py
+      plugins:
+        - kubernetes: *k8s-1gpu
+
+    - label: "V1 e2e (2 GPUs)"
+      key: v1-e2e-2-gpus
+      timeout_in_minutes: 30
+      agents:
+        queue: intel-b70
+      env: *env
+      commands:
+        - cd /workspace/vllm/tests
+        - pytest -v -s v1/e2e/spec_decode/draft_model/test_draft_model.py::test_draft_model_tensor_parallelism v1/e2e/spec_decode/draft_model/test_draft_model.py::test_draft_model_engine_args_tensor_parallelism
+      plugins:
+        - kubernetes: *k8s-2gpu
