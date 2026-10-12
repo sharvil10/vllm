@@ -53,6 +53,12 @@
     containers: &containers
       - image: ${VLLM_XPU_IMAGE}
         workingDir: /workspace/vllm
+        env:
+          - name: HF_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: hf-token
+                key: HF_TOKEN
         resources:
           claims:
             - name: gpu
