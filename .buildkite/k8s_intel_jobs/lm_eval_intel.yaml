@@ -37,6 +37,13 @@
     containers:
       - image: ${VLLM_XPU_IMAGE}
         workingDir: /workspace/vllm
+        env:
+          # Gated HF models (meta-llama/*); upstream passes HF_TOKEN too.
+          - name: HF_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: hf-token
+                key: HF_TOKEN
         resources:
           claims:
             - name: gpu
@@ -87,6 +94,13 @@
     containers:
       - image: ${VLLM_XPU_IMAGE}
         workingDir: /workspace/vllm
+        env:
+          # Gated HF models (meta-llama/*); upstream passes HF_TOKEN too.
+          - name: HF_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: hf-token
+                key: HF_TOKEN
         resources:
           claims:
             - name: gpu
