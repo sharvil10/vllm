@@ -1,0 +1,85 @@
+# Kubernetes-native port of .buildkite/intel_jobs/quantization.yaml.
+# Same tests and timeouts as upstream; see kernels_intel.yaml for how the
+# Pod template works and README.md for the conversion rules.
+
+.env: &env
+  VLLM_TEST_DEVICE: "xpu"
+  PYTHONPATH: ".."
+  # Remove once intel/intel-xpu-backend-for-triton#7682 is fixed (upstream).
+  VLLM_DISABLE_COMPILE_CACHE: "1"
+
+.k8s-1gpu: &k8s-1gpu
+  checkout:
+    skip: true
+  metadata:
+    labels:
+      kueue.x-k8s.io/queue-name: ci-b70
+      kueue.x-k8s.io/priority-class: priority-normal
+  podSpec:
+    resourceClaims:
+      - name: gpu
+        resourceClaimTemplateName: b70-1
+    # Only used when upload.sh points VLLM_XPU_IMAGE at the private ghcr mirror.
+    imagePullSecrets:
+      - name: ghcr-push
+    initContainers:
+      - name: copy-vllm-src
+        image: ${VLLM_XPU_IMAGE}
+        command: ["cp", "-a", "/workspace/vllm", "/mnt/workspace/"]
+        volumeMounts:
+          - name: workspace
+            mountPath: /mnt/workspace
+    containers:
+      - image: ${VLLM_XPU_IMAGE}
+        workingDir: /workspace/vllm
+        env:
+          # Gated HF models (meta-llama/*); upstream passes HF_TOKEN too.
+          - name: HF_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: hf-token
+                key: HF_TOKEN
+        resources:
+          claims:
+            - name: gpu
+          requests:
+            cpu: "8"
+            memory: "32Gi"
+          limits:
+            cpu: "32"
+            memory: "64Gi"
+        volumeMounts:
+          # Upstream runs with --ipc=host; the Pod default /dev/shm is 64 MiB.
+          - name: dshm
+            mountPath: /dev/shm
+          # Upstream mounts /data/huggingface here; node-local cache on the worker.
+          - name: hf-cache
+            mountPath: /root/.cache/huggingface
+    volumes:
+      - name: dshm
+        emptyDir:
+          medium: Memory
+          sizeLimit: 8Gi
+      - name: hf-cache
+        hostPath:
+          path: /var/lib/hf-cache
+          type: DirectoryOrCreate
+
+steps:
+  - group: Quantization
+    key: quantization-intel
+    steps:
+    - label: Quantization
+      key: quantization
+      timeout_in_minutes: 30
+      agents:
+        queue: intel-b70
+      env: *env
+      commands:
+        - cd /workspace/vllm
+        - 'VLLM_TEST_FORCE_LOAD_FORMAT=auto pytest -v -s tests/quantization/test_per_token_kv_cache.py --deselect="tests/quantization/test_per_token_kv_cache.py::test_triton_unified_attention_per_token_head_scale[int4-16-128-num_heads0-seq_lens1]"'
+        - VLLM_TEST_FORCE_LOAD_FORMAT=auto pytest -v -s tests/quantization/test_auto_awq.py
+        - VLLM_TEST_FORCE_LOAD_FORMAT=auto pytest -v -s tests/quantization/test_fp8_per_channel.py
+        - 'VLLM_TEST_FORCE_LOAD_FORMAT=auto pytest -v -s tests/models/quantization/test_fp8_per_channel.py --deselect="tests/models/quantization/test_fp8_per_channel.py::test_fp8_per_channel_logprobs[moe]"'
+      plugins:
+        - kubernetes: *k8s-1gpu
