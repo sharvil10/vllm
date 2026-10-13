@@ -67,19 +67,19 @@ curl -X POST -H "Authorization: Bearer $BK_TOKEN" \
 
 ## Status
 
-Pass criterion: match upstream's result for the same commit (upstream Intel
-tests run in https://buildkite.com/vllm/intel-ci, also on B70s). Baseline is
-now the daily full run #13969 on `fe341a53dd`, where every step passed. The
-results below are from the earlier pin `deedc7be00` (baseline intel-ci #13967);
-"not run" means that step was blocked in #13967. All of those passed in #13969.
+Pass criterion: match upstream's result for the same commit. Upstream Intel
+tests run in https://buildkite.com/vllm/intel-ci, also on B70s. Compare
+against the scheduled "Full intel CI-daily" build: per-commit intel-ci builds
+skip steps whose `source_file_dependencies` didn't change, so they leave gaps.
 
-| workflow | result vs upstream | builds |
+**`fe341a53dd` vs daily intel-ci #13969: 63/63 jobs match (all pass).**
+Full run: https://buildkite.com/sharvil-shah/vllm-intel-k8s/builds/14 (15
+files, 56 steps, 63 jobs incl. parallel shards; about 2h on 8 B70s).
+
+Three jobs needed a retry within that build; none was a conversion problem:
+
+| step | first attempt | cause |
 | --- | --- | --- |
-| kernels_intel | 2/2 pass (upstream: not run) | #3 |
-| basic_correctness, benchmarks, expert_parallelism, quantization, models_distributed | 5/5 pass; 2 match upstream, 3 not run upstream | #4, #9 |
-| samplers, model_executor | 4/4 pass, all match | #12 |
-| lm_eval | LM Eval Large pass; GPQA (GPT-OSS) failed on a DNS flake (not run upstream) | #6 |
-| engine, entrypoints | 9/10 pass, all 4 upstream-run steps match; Engine (1 GPU) needs Gemma access | #10 |
-| lora | 7/7 pass (not run upstream) | #13 |
-| models_multimodal | Std 1 and Ext Gen 1 pass; Std 2–4 and Processor ×4 **mismatch**: gated models (Gemma, PaliGemma, Llama 4, Cohere, Eagle, MiniCPM-V) need licenses accepted on the hf-token account | #13 |
-| misc, test_intel | 22/23 match; XPU V1 test **mismatch** on Gemma license (403) | #11 |
+| Engine (1 GPU) | 2 failed, 403 | `meta-llama/Meta-Llama-3-8B-Instruct` license not yet accepted on the hf-token account |
+| API Server Generate | 1 failed | `test_chat_completion_without_tools[hermes]`: streamed and non-streamed text differed; passed on retry (flaky) |
+| XPU GPQA Eval (GPT-OSS) | 1 failed | DNS: nodelocaldns forwards only to 8.8.8.8/8.8.4.4, which time out intermittently (~300 timeouts in 4h) |
