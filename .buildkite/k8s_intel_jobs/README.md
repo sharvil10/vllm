@@ -13,8 +13,10 @@ side.
   in build env `K8S_INTEL_JOBS`.
 - Image pinned for now: the cluster's NAT IP is over ECR Public's anonymous
   data cap, so the pipeline's upload step defaults to upstream commit
-  `deedc7be008f…` copied to `ghcr.io/sharvil10/vllm-ci-test-repo` (private,
-  pulled with `imagePullSecrets: ghcr-push`).
+  `fe341a53dda0…` copied to `ghcr.io/sharvil10/vllm-ci-test-repo` (private,
+  pulled with `imagePullSecrets: ghcr-push`). That is the commit of upstream's
+  "Full intel CI-daily" build #13969, which runs every step (per-commit
+  intel-ci builds skip steps whose `source_file_dependencies` didn't change).
 
 ## Converting a workflow
 
@@ -66,9 +68,10 @@ curl -X POST -H "Authorization: Bearer $BK_TOKEN" \
 ## Status
 
 Pass criterion: match upstream's result for the same commit (upstream Intel
-tests run in https://buildkite.com/vllm/intel-ci, also on B70s). Baseline for
-`deedc7be00` is intel-ci #13967. "not run" means the step was blocked
-upstream, so there is no baseline.
+tests run in https://buildkite.com/vllm/intel-ci, also on B70s). Baseline is
+now the daily full run #13969 on `fe341a53dd`, where every step passed. The
+results below are from the earlier pin `deedc7be00` (baseline intel-ci #13967);
+"not run" means that step was blocked in #13967. All of those passed in #13969.
 
 | workflow | result vs upstream | builds |
 | --- | --- | --- |
