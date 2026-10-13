@@ -48,6 +48,12 @@ Rules that bite:
   gated meta-llama models. The HF cache is the node-local hostPath
   `/var/lib/hf-cache`.
 - Name files `<stem>_intel.yaml` so the upload glob picks them up.
+- Every file is uploaded into one build, so step and group keys must be unique
+  across all files, and a group key can't reuse one of its step keys.
+- Upstream's `optional: true` is a field for its own pipeline generator, not
+  Buildkite; map it to `soft_fail: true`.
+- Multi-GPU templates (`.k8s-2gpu`, `.k8s-4gpu`) are the 1-GPU template with
+  `b70-N` and larger memory limits.
 
 Test one file in isolation from a `k8s-ci-<name>` branch:
 
@@ -59,6 +65,18 @@ curl -X POST -H "Authorization: Bearer $BK_TOKEN" \
 
 ## Status
 
-| workflow | status |
-| --- | --- |
-| kernels_intel | passing (build #3) |
+Pass criterion: match upstream's result for the same commit (upstream Intel
+tests run in https://buildkite.com/vllm/intel-ci, also on B70s). Baseline for
+`deedc7be00` is intel-ci #13967. "not run" means the step was blocked
+upstream, so there is no baseline.
+
+| workflow | result vs upstream | builds |
+| --- | --- | --- |
+| kernels_intel | 2/2 pass (upstream: not run) | #3 |
+| basic_correctness, benchmarks, expert_parallelism, quantization, models_distributed | 5/5 pass; 2 match upstream, 3 not run upstream | #4, #9 |
+| samplers, model_executor | 4/4 pass, all match | #12 |
+| lm_eval | LM Eval Large pass; GPQA (GPT-OSS) failed on a DNS flake (not run upstream) | #6 |
+| engine, entrypoints | 9/10 pass, all 4 upstream-run steps match; Engine (1 GPU) needs Gemma access | #10 |
+| lora | 7/7 pass (not run upstream) | #13 |
+| models_multimodal | Std 1 and Ext Gen 1 pass; Std 2–4 and Processor ×4 **mismatch**: gated models (Gemma, PaliGemma, Llama 4, Cohere, Eagle, MiniCPM-V) need licenses accepted on the hf-token account | #13 |
+| misc, test_intel | 22/23 match; XPU V1 test **mismatch** on Gemma license (403) | #11 |
