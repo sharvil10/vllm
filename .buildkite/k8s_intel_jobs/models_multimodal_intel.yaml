@@ -20,8 +20,6 @@
 #
 # Deviations: upstream Standard 3 is missing `&&` before test_qwen2_vl.py
 # (folds into one bogus pytest call); here it runs as its own command.
-# Upstream's `optional: true` (Extended Generation 1) is a generator-only
-# field, so it is dropped and the step always runs.
 #
 # Env mirrors what run-intel-test.sh sets for the container.
 
@@ -111,6 +109,9 @@ steps:
       agents:
         queue: intel-b70
       env: *env
+      source_file_dependencies:
+        - vllm/
+        - tests/models/multimodal
       commands:
         - cd /workspace/vllm/tests
         - pytest -v -s models/multimodal/generation/test_common.py -m core_model -k "qwen2"
@@ -124,6 +125,9 @@ steps:
       agents:
         queue: intel-b70
       env: *env
+      source_file_dependencies:
+        - vllm/
+        - tests/models/multimodal
       commands:
         - cd /workspace/vllm/tests
         - pytest -v -s models/multimodal/generation/test_common.py -m core_model -k "qwen3 or gemma"
@@ -138,6 +142,9 @@ steps:
       agents:
         queue: intel-b70
       env: *env
+      source_file_dependencies:
+        - vllm/
+        - tests/models/multimodal
       commands:
         - cd /workspace/vllm/tests
         - pytest -v -s models/multimodal/generation/test_common.py -m core_model -k "not qwen2 and not qwen3 and not gemma"
@@ -152,6 +159,9 @@ steps:
       agents:
         queue: intel-b70
       env: *env
+      source_file_dependencies:
+        - vllm/
+        - tests/models/multimodal
       commands:
         - cd /workspace/vllm/tests
         - pytest -v -s models/multimodal -m core_model --ignore models/multimodal/generation/test_common.py --ignore models/multimodal/generation/test_ultravox.py --ignore models/multimodal/generation/test_qwen2_5_vl.py --ignore models/multimodal/generation/test_qwen2_vl.py --ignore models/multimodal/generation/test_whisper.py --ignore models/multimodal/generation/test_gemma_ragged_audio.py --ignore models/multimodal/generation/test_memory_leak.py --ignore models/multimodal/processing
@@ -165,6 +175,10 @@ steps:
       agents:
         queue: intel-b70
       env: *env
+      source_file_dependencies:
+        - vllm/
+        - tests/models/multimodal
+        - tests/models/registry.py
       commands:
         - cd /workspace/vllm/tests
         - pytest -v -s models/multimodal/processing/test_tensor_schema.py --deselect="tests/models/multimodal/processing/test_tensor_schema.py::test_model_tensor_schema[deepseek-ai/DeepSeek-V4.1-Flash]" --num-shards=$$BUILDKITE_PARALLEL_JOB_COUNT --shard-id=$$BUILDKITE_PARALLEL_JOB
@@ -177,6 +191,12 @@ steps:
       agents:
         queue: intel-b70
       env: *env
+      optional: true
+      source_file_dependencies:
+        - vllm/
+        - "!vllm/distributed/kv_transfer/"
+        - tests/models/multimodal/generation
+        - tests/models/multimodal/test_mapping.py
       commands:
         - cd /workspace/vllm/tests
         - pytest -v -s models/multimodal/test_mapping.py

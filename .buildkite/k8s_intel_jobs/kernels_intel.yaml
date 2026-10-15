@@ -18,6 +18,9 @@
 # /workspace/vllm explicitly. They run under the image's /bin/sh (dash) with
 # -e; BUILDKITE_SHELL is a protected var, so wrap bashisms in `bash -c`.
 #
+# `source_file_dependencies` and `optional` are upstream generator fields,
+# kept verbatim; select_steps.py applies them at upload time (see README.md).
+#
 # Env mirrors what run-intel-test.sh sets for the container.
 
 .env: &env
@@ -93,6 +96,9 @@ steps:
       agents:
         queue: intel-b70
       env: *env
+      source_file_dependencies:
+        - vllm/ir
+        - vllm/kernels
       commands:
         - cd /workspace/vllm/tests
         - pytest -v -s ir
@@ -106,6 +112,9 @@ steps:
       agents:
         queue: intel-b70
       env: *env
+      source_file_dependencies:
+        - tests/kernels/core/test_uva.py
+        - vllm/utils/torch_utils.py
       commands:
         - cd /workspace/vllm/tests
         - pytest -v -s kernels/core/test_uva.py

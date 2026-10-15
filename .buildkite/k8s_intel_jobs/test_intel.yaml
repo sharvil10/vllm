@@ -124,6 +124,9 @@ steps:
       agents:
         queue: intel-b70
       env: *env
+      source_file_dependencies:
+        - vllm/
+        - .buildkite/intel_jobs/test-intel.yaml
       commands:
       - cd /workspace/vllm
       - python3 examples/basic/offline_inference/generate.py --model facebook/opt-125m --block-size 64 --enforce-eager
@@ -147,6 +150,9 @@ steps:
       agents:
         queue: intel-b70
       env: *env
+      source_file_dependencies:
+        - vllm/
+        - .buildkite/intel_jobs/test-intel.yaml
       commands:
       - cd /workspace/vllm
       - python3 examples/basic/offline_inference/generate.py --linear-backend xpu --model RedHatAI/Meta-Llama-3.1-8B-Instruct-FP8 --enforce-eager --max-model-len 4096
@@ -164,6 +170,9 @@ steps:
         queue: intel-b70
       env: *env
       parallelism: 2
+      source_file_dependencies:
+        - vllm/
+        - .buildkite/intel_jobs/test-intel.yaml
       commands:
       - cd /workspace/vllm
       - export PYTEST_ADDOPTS="--num-shards=$$BUILDKITE_PARALLEL_JOB_COUNT --shard-id=$$BUILDKITE_PARALLEL_JOB"
@@ -186,6 +195,9 @@ steps:
       agents:
         queue: intel-b70
       env: *env
+      source_file_dependencies:
+        - vllm/
+        - .buildkite/intel_jobs/test-intel.yaml
       commands:
       - cd /workspace/vllm
       - cd tests
@@ -202,6 +214,9 @@ steps:
       agents:
         queue: intel-b70
       env: *env
+      source_file_dependencies:
+        - vllm/
+        - .buildkite/intel_jobs/test-intel.yaml
       commands:
       - cd /workspace/vllm
       - cd tests
@@ -215,6 +230,9 @@ steps:
       agents:
         queue: intel-b70
       env: *env
+      source_file_dependencies:
+        - vllm/
+        - .buildkite/intel_jobs/test-intel.yaml
       commands:
       - cd /workspace/vllm
       - cd tests
@@ -228,6 +246,10 @@ steps:
       agents:
         queue: intel-b70
       env: *env
+      source_file_dependencies:
+        - vllm/
+        - tests/quantization/test_compressed_tensors.py
+        - .buildkite/intel_jobs/test-intel.yaml
       commands:
       - cd /workspace/vllm
       - cd tests
@@ -241,6 +263,17 @@ steps:
       agents:
         queue: intel-b70
       env: *env
+      source_file_dependencies:
+        - vllm/compilation/
+        - vllm/config/compilation.py
+        - vllm/platforms/xpu.py
+        - vllm/v1/cudagraph_dispatcher.py
+        - vllm/v1/worker/encoder_cudagraph.py
+        - vllm/v1/worker/encoder_cudagraph_defs.py
+        - vllm/v1/worker/xpu_model_runner.py
+        - vllm/v1/worker/xpu_worker.py
+        - tests/v1/cudagraph
+        - .buildkite/intel_jobs/test-intel.yaml
       commands:
       - cd /workspace/vllm
       - cd tests

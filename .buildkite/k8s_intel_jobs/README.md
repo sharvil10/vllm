@@ -11,6 +11,9 @@ side.
 - `upload.sh` resolves the image (`VLLM_COMMIT`, `VLLM_IMAGE_MIRROR`) and
   uploads every `*_intel.yaml` here, or only the space-separated file names
   in build env `K8S_INTEL_JOBS`.
+- Step selection matches upstream's generator (`select_steps.py`, see
+  below): steps whose `source_file_dependencies` don't match the commit's
+  changes, and `optional: true` steps, wait behind a `Run <label>` block step.
 - Image pinned for now: the cluster's NAT IP is over ECR Public's anonymous
   data cap, so the pipeline's upload step defaults to upstream commit
   `fe341a53dda0…` copied to `ghcr.io/sharvil10/vllm-ci-test-repo` (private,
@@ -26,10 +29,11 @@ verbatim, then for each upstream step:
 | upstream | here |
 | --- | --- |
 | `group: X` + top-level `steps:` | `steps: [ {group: X, key: <file-stem>, steps: [...]} ]` (`pipeline upload` needs `steps:` at the top) |
-| `depends_on: image-build-xpu`, `device`, `no_plugin`, `working_dir`, `source_file_dependencies`, `agent_tags` | drop them |
+| `depends_on: image-build-xpu`, `device`, `no_plugin`, `working_dir`, `agent_tags` | drop them |
 | `agent_tags.gpu: N+` | anchor `.k8s-Ngpu` using `resourceClaimTemplateName: b70-N` (templates exist for 1/2/4/8) |
 | `env: REGISTRY/REPO/VLLM_TEST_DEVICE` | `env: *env` (merge extra step env with `<<: *env`) |
 | `timeout_in_minutes`, `label`, `key`, `parallelism`, `soft_fail`, `retry` | keep as-is |
+| `optional`, `source_file_dependencies` | keep as-is (quote `"!..."` exclusions); `select_steps.py` applies and strips them at upload |
 | `bash .buildkite/scripts/hardware_ci/run-intel-test.sh '<cmds>'` | `commands:` list. First item is `cd /workspace/vllm/tests` (or `cd /workspace/vllm` if the upstream string doesn't `cd tests`). Then the `&&`-separated commands, one per item |
 | `parallelism: N` | run-intel-test.sh's sharding is lost, so add `PYTEST_ADDOPTS="--num-shards=$$BUILDKITE_PARALLEL_JOB_COUNT --shard-id=$$BUILDKITE_PARALLEL_JOB"` to the pytest command (`$$` escapes upload-time interpolation) |
 
@@ -52,10 +56,46 @@ Rules that bite:
 - Name files `<stem>_intel.yaml` so the upload glob picks them up.
 - Every file is uploaded into one build, so step and group keys must be unique
   across all files, and a group key can't reuse one of its step keys.
-- Upstream's `optional: true` is a field for its own pipeline generator, not
-  Buildkite; map it to `soft_fail: true`.
+- Keep `optional: true` as `optional: true`. It is not `soft_fail`:
+  `optional` means the step only runs after a manual unblock (or with
+  `NIGHTLY=1`), while `soft_fail` runs it and ignores its failure.
 - Multi-GPU templates (`.k8s-2gpu`, `.k8s-4gpu`) are the 1-GPU template with
   `b70-N` and larger memory limits.
+
+## Step selection
+
+Buildkite doesn't act on `source_file_dependencies` or `optional`; upstream's
+pipeline generator (vllm-project/ci-infra `buildkite/pipeline_generator`)
+consumes them. Our files are uploaded directly, so `upload.sh` reproduces
+its `_step_should_run`:
+
+1. Diff: the files `VLLM_COMMIT` changes against its merge-base with upstream
+   `main`, or against its parent if it is on `main` (upstream's `HEAD~1`).
+   `upload.sh` gets them with a treeless fetch of upstream (~20 MB). If that
+   fails it falls back to `RUN_ALL=1`, as upstream's bootstrap does.
+2. `select_steps.py`, per step: `NOAUTO=1` blocks; `NIGHTLY=1` runs;
+   `optional: true` blocks; run-all (`RUN_ALL=1`, or a changed file matching
+   `run_all_patterns` in `../ci_config_intel.yaml`) runs; otherwise the step
+   runs only if a changed file is under one of its `source_file_dependencies`
+   (`!` entries exclude) or is the job file itself.
+3. A step that doesn't run gets a `block: Run <label>` step (key
+   `block-<key>`) in front of it, so it can be unblocked from the UI.
+
+| build env | effect |
+| --- | --- |
+| (none) | diff-based selection; optional steps blocked |
+| `RUN_ALL=1` | every non-optional step runs |
+| `NIGHTLY=1` | every step runs, including optional ones (what the daily baseline does) |
+| `NOAUTO=1` | every step blocked |
+
+The upload agent image has `python3` but no PyYAML, so files are converted to
+JSON with `buildkite-agent pipeline upload --dry-run --format json` (which
+also resolves anchors and interpolates), then uploaded with
+`--no-interpolation`.
+
+Checked against upstream for two `main` commits: the run/block split matches
+intel-ci for all 56 shared steps (4d9a8d6a / #14326: 30 run, 26 blocked;
+d6f0b7a4 / #14319: 0 run, 56 blocked).
 
 Test one file in isolation from a `k8s-ci-<name>` branch:
 
@@ -67,7 +107,9 @@ curl -X POST -H "Authorization: Bearer $BK_TOKEN" \
 
 ## Status
 
-Pass criterion: match upstream's result for the same commit. Upstream Intel
+Pass criterion: match upstream's result for the same commit. Full
+comparison runs need `NIGHTLY=1`; without it most steps are blocked, as they
+are upstream. Upstream Intel
 tests run in https://buildkite.com/vllm/intel-ci, also on B70s. Compare
 against the scheduled "Full intel CI-daily" build: per-commit intel-ci builds
 skip steps whose `source_file_dependencies` didn't change, so they leave gaps.

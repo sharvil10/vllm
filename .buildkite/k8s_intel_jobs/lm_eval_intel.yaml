@@ -3,9 +3,6 @@
 # Same tests and timeouts as upstream; see README.md for the conversion rules
 # and kernels_intel.yaml for why the pod spec looks the way it does
 # (copy-vllm-src init container, explicit cd, dash shell).
-#
-# Upstream marks "LM Eval Large Models(2 GPUs)" `optional: true` (a field
-# for upstream's generator, not Buildkite); here it is soft_fail instead.
 
 .env: &env
   VLLM_TEST_DEVICE: "xpu"
@@ -137,6 +134,10 @@ steps:
       agents:
         queue: intel-b70
       env: *env
+      source_file_dependencies:
+        - csrc/
+        - vllm/model_executor/layers/quantization
+        - tests/evals/gpt_oss/
       commands:
         - cd /workspace/vllm/tests
         - pytest -s -v evals/gpt_oss/test_gpqa_correctness.py --config-list-file=configs/models-xpu.txt
@@ -146,10 +147,13 @@ steps:
     - label: LM Eval Large Models(2 GPUs)
       key: lm-eval-large-models-2-gpus
       timeout_in_minutes: 45
-      soft_fail: true
       agents:
         queue: intel-b70
       env: *env
+      optional: true
+      source_file_dependencies:
+        - vllm/
+        - .buildkite/lm-eval-harness/
       commands:
         - cd /workspace/vllm/.buildkite/lm-eval-harness
         - export VLLM_USE_DEEP_GEMM=0

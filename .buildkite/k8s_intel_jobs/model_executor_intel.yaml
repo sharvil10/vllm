@@ -77,6 +77,11 @@ steps:
       agents:
         queue: intel-b70
       env: *env
+      source_file_dependencies:
+        - vllm/engine/arg_utils.py
+        - vllm/config/model.py
+        - vllm/model_executor
+        - tests/model_executor
       commands:
         - apt-get update && apt-get install -y curl libsodium23
         - export VLLM_WORKER_MULTIPROC_METHOD=spawn
@@ -92,6 +97,11 @@ steps:
       agents:
         queue: intel-b70
       env: *env
+      source_file_dependencies:
+        - vllm/engine/arg_utils.py
+        - vllm/config/model.py
+        - vllm/model_executor
+        - tests/model_executor
       commands:
         - apt-get update && apt-get install -y curl libsodium23
         - export VLLM_WORKER_MULTIPROC_METHOD=spawn

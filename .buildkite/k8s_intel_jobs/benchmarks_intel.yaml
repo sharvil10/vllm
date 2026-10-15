@@ -75,6 +75,9 @@ steps:
       agents:
         queue: intel-b70
       env: *env
+      source_file_dependencies:
+        - vllm/
+        - tests/benchmarks/
       commands:
         - cd /workspace/vllm/tests
         - pytest -v -s benchmarks/

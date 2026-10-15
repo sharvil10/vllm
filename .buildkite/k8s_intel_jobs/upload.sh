@@ -20,6 +20,13 @@
 #
 # Exports VLLM_XPU_IMAGE / VLLM_COMMIT and uploads each *_intel.yaml in this
 # directory (or just the space-separated files in K8S_INTEL_JOBS).
+#
+# Step selection follows upstream's generator (see select_steps.py): steps
+# whose source_file_dependencies don't match the files VLLM_COMMIT changes,
+# and `optional: true` steps, are uploaded behind a block step. The diff is
+# against VLLM_COMMIT's merge-base with upstream main, or its parent if it is
+# on main (like upstream's HEAD~1). Build env RUN_ALL=1 runs everything but
+# optional steps, NIGHTLY=1 runs everything, NOAUTO=1 blocks everything.
 set -euo pipefail
 
 REGISTRY="public.ecr.aws/q9t5s3a7"
@@ -77,7 +84,48 @@ else
   files=("${DIR}"/*_intel.yaml)
 fi
 
+tmp=$(mktemp -d)
+trap 'rm -rf "${tmp}"' EXIT
+
+changed_files() {
+  local up="${tmp}/upstream" base
+  git init -q --bare "${up}"
+  # Treeless: commits only (~20 MB); diff fetches the two trees it needs.
+  git -C "${up}" fetch -q --filter=tree:0 --no-tags \
+    https://github.com/vllm-project/vllm.git +refs/heads/main:refs/heads/main "$1" || return
+  base=$(git -C "${up}" merge-base main "$1") || return
+  if [[ "${base}" == "$1" ]]; then
+    base="$1~1"
+  fi
+  git -C "${up}" diff --name-only --diff-filter=ACMDR "${base}" "$1"
+}
+
+: > "${tmp}/diff.txt"
+if [[ "${NIGHTLY:-0}" != "1" && "${RUN_ALL:-0}" != "1" && "${NOAUTO:-0}" != "1" ]]; then
+  if ! changed_files "${VLLM_COMMIT}" > "${tmp}/diff.txt"; then
+    # Same fallback as upstream's bootstrap when it can't find a merge-base.
+    echo "WARNING: could not diff ${VLLM_COMMIT} against upstream main; RUN_ALL=1" >&2
+    export RUN_ALL=1
+  fi
+  echo "Changed files in ${VLLM_COMMIT:0:12}:"
+  cat "${tmp}/diff.txt"
+fi
+
+# `pipeline upload --dry-run` resolves anchors and interpolates ${VLLM_XPU_IMAGE}
+# / $$, so the final upload below must not interpolate again.
+mkdir "${tmp}/in" "${tmp}/out"
+buildkite-agent pipeline upload --dry-run --format json \
+  "${DIR}/../ci_config_intel.yaml" > "${tmp}/config.json"
 for f in "${files[@]}"; do
-  echo "Uploading ${f}"
-  buildkite-agent pipeline upload "${f}"
+  buildkite-agent pipeline upload --dry-run --format json "${f}" \
+    > "${tmp}/in/$(basename "${f}" .yaml).json"
+done
+python3 "${DIR}/select_steps.py" --config "${tmp}/config.json" \
+  --diff "${tmp}/diff.txt" --summary "${tmp}/summary.md" \
+  --source-dir .buildkite/k8s_intel_jobs "${tmp}/in" "${tmp}/out"
+buildkite-agent annotate --style info --context step-selection < "${tmp}/summary.md"
+
+for f in "${tmp}"/out/*.json; do
+  echo "Uploading $(basename "${f}" .json).yaml"
+  buildkite-agent pipeline upload --no-interpolation "${f}"
 done

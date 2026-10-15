@@ -75,6 +75,10 @@ steps:
       agents:
         queue: intel-b70
       env: *env
+      source_file_dependencies:
+        - vllm/
+        - tests/basic_correctness/memory/
+        - tests/basic_correctness/cpu_offload/
       commands:
         - cd /workspace/vllm/tests
         - export VLLM_WORKER_MULTIPROC_METHOD=spawn

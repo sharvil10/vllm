@@ -2,8 +2,7 @@
 #
 # Same tests and timeouts as upstream; runner differences (image, DRA GPUs,
 # Kueue, copy-vllm-src init container, explicit cd) are described in
-# kernels_intel.yaml and README.md. Upstream `optional: true` (a generator
-# field) is mapped to `soft_fail: true`.
+# kernels_intel.yaml and README.md.
 
 .env: &env
   VLLM_TEST_DEVICE: "xpu"
@@ -78,6 +77,11 @@ steps:
       agents:
         queue: intel-b70
       env: *env
+      source_file_dependencies:
+        - vllm/entrypoints
+        - tests/entrypoints/unit_tests
+        - tests/entrypoints/rl/weight_transfer
+        - tests/entrypoints/launchers
       commands:
         - cd /workspace/vllm/tests
         - pytest -v -s entrypoints/unit_tests
@@ -91,6 +95,9 @@ steps:
       agents:
         queue: intel-b70
       env: *env
+      source_file_dependencies:
+        - vllm/
+        - tests/entrypoints/llm
       commands:
         - export VLLM_WORKER_MULTIPROC_METHOD=spawn
         - cd /workspace/vllm/tests
@@ -105,6 +112,11 @@ steps:
       agents:
         queue: intel-b70
       env: *env
+      source_file_dependencies:
+        - vllm/
+        - "!vllm/distributed/kv_transfer/"
+        - tests/entrypoints/serve
+        - tests/entrypoints/rl
       commands:
         - export VLLM_WORKER_MULTIPROC_METHOD=spawn
         - cd /workspace/vllm/tests
@@ -121,6 +133,10 @@ steps:
       agents:
         queue: intel-b70
       env: *env
+      source_file_dependencies:
+        - vllm/
+        - "!vllm/distributed/kv_transfer/"
+        - tests/entrypoints/scale_out
       commands:
         - export VLLM_WORKER_MULTIPROC_METHOD=spawn
         - cd /workspace/vllm/tests
@@ -131,10 +147,18 @@ steps:
     - label: ":intel: (BMG) Entrypoints Integration (API Server Generate)"
       key: entrypoints-integration-api-server-generate-intel
       timeout_in_minutes: 65
-      soft_fail: true
       agents:
         queue: intel-b70
       env: *env
+      optional: true
+      source_file_dependencies:
+        - vllm/
+        - "!vllm/distributed/kv_transfer/"
+        - tests/tool_use
+        - tests/entrypoints/tool_parsers
+        - tests/entrypoints/generate
+        - tests/entrypoints/anthropic
+        - tests/entrypoints/cohere
       commands:
         - cd /workspace/vllm/tests
         - >-
@@ -149,10 +173,14 @@ steps:
     - label: ":intel: (BMG) Entrypoints Integration (Responses API)"
       key: entrypoints-integration-responses-api-intel
       timeout_in_minutes: 60
-      soft_fail: true
       agents:
         queue: intel-b70
       env: *env
+      optional: true
+      source_file_dependencies:
+        - vllm/
+        - "!vllm/distributed/kv_transfer/"
+        - tests/entrypoints/openai/responses
       commands:
         - cd /workspace/vllm/tests
         - pytest -v -s entrypoints/openai/responses
@@ -165,6 +193,9 @@ steps:
       agents:
         queue: intel-b70
       env: *env
+      source_file_dependencies:
+        - csrc/
+        - vllm/entrypoints/openai/
       commands:
         - cd /workspace/vllm/tests
         - pytest -v -s entrypoints/openai/correctness/
