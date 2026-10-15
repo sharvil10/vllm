@@ -71,7 +71,7 @@ steps:
   - group: Samplers Intel
     key: samplers-intel
     steps:
-    - label: Samplers Test (XPU Kernel)
+    - label: ":intel: (BMG) Samplers Test (XPU Kernel)"
       key: samplers-test-xpu-kernel-intel
       timeout_in_minutes: 40
       agents:
@@ -89,7 +89,7 @@ steps:
       plugins:
         - kubernetes: *k8s-1gpu
 
-    - label: Samplers Beam Search Test (XPU Kernel)
+    - label: ":intel: (BMG) Samplers Beam Search Test (XPU Kernel)"
       key: samplers-beam-search-test-xpu-kernel-intel
       timeout_in_minutes: 40
       agents:

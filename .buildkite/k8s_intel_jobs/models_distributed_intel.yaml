@@ -66,10 +66,10 @@
           type: DirectoryOrCreate
 
 steps:
-  - group: Models - Distributed
+  - group: Models - Distributed Intel
     key: models-distributed-intel
     steps:
-    - label: Distributed Model Tests (2 GPUs)
+    - label: ":intel: (BMG) Distributed Model Tests"
       key: distributed-model-tests-2-gpus
       timeout_in_minutes: 65
       agents:

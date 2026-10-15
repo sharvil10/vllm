@@ -125,6 +125,27 @@ python3 "${DIR}/select_steps.py" --config "${tmp}/config.json" \
   --source-dir .buildkite/k8s_intel_jobs "${tmp}/in" "${tmp}/out"
 buildkite-agent annotate --style info --context step-selection < "${tmp}/summary.md"
 
+# Drift check against this branch's .buildkite/intel_jobs (check_sync.py).
+# Warn rather than fail: the ports still test fine, they're just stale.
+mkdir "${tmp}/sync-up" "${tmp}/sync-k8s"
+for f in "${DIR}"/../intel_jobs/*.yaml; do
+  buildkite-agent pipeline upload --dry-run --no-interpolation --format json "${f}" \
+    > "${tmp}/sync-up/$(basename "${f}" .yaml).json"
+done
+for f in "${DIR}"/*_intel.yaml; do
+  buildkite-agent pipeline upload --dry-run --no-interpolation --format json "${f}" \
+    > "${tmp}/sync-k8s/$(basename "${f}" .yaml).json"
+done
+if ! python3 "${DIR}/check_sync.py" "${tmp}/sync-up" "${tmp}/sync-k8s" > "${tmp}/sync.txt"; then
+  cat "${tmp}/sync.txt"
+  {
+    echo "**k8s_intel_jobs is out of sync with intel_jobs** ($(wc -l < "${tmp}/sync.txt") differences); port the upstream changes:"
+    echo '```'
+    cat "${tmp}/sync.txt"
+    echo '```'
+  } | buildkite-agent annotate --style warning --context k8s-sync
+fi
+
 for f in "${tmp}"/out/*.json; do
   echo "Uploading $(basename "${f}" .json).yaml"
   buildkite-agent pipeline upload --no-interpolation "${f}"

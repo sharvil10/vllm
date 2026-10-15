@@ -1,4 +1,4 @@
-# Kubernetes-native port of .buildkite/intel_jobs/quantization.yaml.
+# Kubernetes-native port of .buildkite/intel_jobs/quantization_intel.yaml.
 # Same tests and timeouts as upstream; see kernels_intel.yaml for how the
 # Pod template works and README.md for the conversion rules.
 
@@ -66,10 +66,10 @@
           type: DirectoryOrCreate
 
 steps:
-  - group: Quantization
+  - group: Quantization Intel
     key: quantization-intel
     steps:
-    - label: Quantization
+    - label: ":intel: (BMG) Quantization"
       key: quantization
       timeout_in_minutes: 30
       agents:

@@ -21,6 +21,30 @@ side.
   "Full intel CI-daily" build #13969, which runs every step (per-commit
   intel-ci builds skip steps whose `source_file_dependencies` didn't change).
 
+## Keeping in sync with intel_jobs
+
+Every change to upstream `.buildkite/intel_jobs/` must be ported here. After
+merging upstream `main`, `check_sync.py` lists what drifted, matched by step
+key: missing or extra steps, group, label, timeout, parallelism, retry,
+soft_fail, optional, source_file_dependencies, test env, GPU count, and
+commands (compared after undoing the conversion rules below). `upload.sh`
+runs it on every build and posts a warning annotation (`k8s-sync`) if
+anything differs; the build still runs. To run it locally:
+
+```bash
+img=ghcr.io/buildkite/agent:3   # anything with buildkite-agent + python3
+docker run --rm -v "$PWD/.buildkite:/b:ro" --entrypoint bash \
+  -e BUILDKITE_AGENT_ACCESS_TOKEN=xxxxxxxx -e BUILDKITE_JOB_ID=0 "$img" -c '
+  mkdir -p /tmp/up /tmp/k8s
+  for f in /b/intel_jobs/*.yaml; do buildkite-agent pipeline upload --dry-run --no-interpolation --format json "$f" > /tmp/up/$(basename $f .yaml).json 2>/dev/null; done
+  for f in /b/k8s_intel_jobs/*_intel.yaml; do buildkite-agent pipeline upload --dry-run --no-interpolation --format json "$f" > /tmp/k8s/$(basename $f .yaml).json 2>/dev/null; done
+  python3 /b/k8s_intel_jobs/check_sync.py /tmp/up /tmp/k8s'
+```
+
+Intentional command differences go in `DEVIATIONS` in `check_sync.py`,
+together with the upstream commands the port was written against, so a later
+upstream change to that step is still reported.
+
 ## Converting a workflow
 
 Copy `kernels_intel.yaml` as the template: keep its `.env` and `.k8s-*` anchors
@@ -94,7 +118,7 @@ also resolves anchors and interpolates), then uploaded with
 `--no-interpolation`.
 
 Checked against upstream for two `main` commits: the run/block split matches
-intel-ci for all 56 shared steps (4d9a8d6a / #14326: 30 run, 26 blocked;
+intel-ci for all 56 steps both had then (4d9a8d6a / #14326: 30 run, 26 blocked;
 d6f0b7a4 / #14319: 0 run, 56 blocked).
 
 Test one file in isolation from a `k8s-ci-<name>` branch:

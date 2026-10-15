@@ -90,7 +90,7 @@ steps:
   - group: Kernels Intel
     key: kernels-intel
     steps:
-    - label: vLLM IR Tests
+    - label: ":intel: (BMG) vLLM IR Tests"
       key: vllm-ir-tests
       timeout_in_minutes: 30
       agents:
@@ -106,7 +106,7 @@ steps:
       plugins:
         - kubernetes: *k8s-1gpu
 
-    - label: UVA Kernel Tests
+    - label: ":intel: (BMG) UVA Kernel Tests"
       key: uva-kernel-tests
       timeout_in_minutes: 20
       agents:

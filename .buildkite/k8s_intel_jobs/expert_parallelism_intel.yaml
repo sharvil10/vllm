@@ -66,10 +66,10 @@
           type: DirectoryOrCreate
 
 steps:
-  - group: Expert Parallelism
+  - group: Expert Parallelism Intel
     key: expert-parallelism-intel
     steps:
-    - label: EPLB Algorithm
+    - label: ":intel: (BMG) EPLB Algorithm"
       key: eplb-algorithm
       timeout_in_minutes: 45
       agents:

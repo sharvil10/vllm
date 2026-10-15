@@ -125,10 +125,10 @@
           type: DirectoryOrCreate
 
 steps:
-  - group: LM Eval
+  - group: LM Eval Intel
     key: lm-eval-intel
     steps:
-    - label: "XPU GPQA Eval (GPT-OSS)"
+    - label: ":intel: (BMG) GPQA Eval (GPT-OSS)"
       key: xpu-gpqa-eval-gpt-oss
       timeout_in_minutes: 60
       agents:
@@ -144,7 +144,7 @@ steps:
       plugins:
         - kubernetes: *k8s-1gpu
 
-    - label: LM Eval Large Models(2 GPUs)
+    - label: ":intel: (BMG) LM Eval Large Models(2 GPUs)"
       key: lm-eval-large-models-2-gpus
       timeout_in_minutes: 45
       agents:

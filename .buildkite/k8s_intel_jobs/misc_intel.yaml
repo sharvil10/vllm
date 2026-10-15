@@ -155,7 +155,7 @@ steps:
   - group: Miscellaneous Intel
     key: misc-intel
     steps:
-    - label: XPU Batch Invariance
+    - label: ":intel: (BMG) Batch Invariance"
       key: xpu-batch-invariance
       timeout_in_minutes: 60
       agents:
@@ -174,7 +174,7 @@ steps:
       - bash ../.buildkite/scripts/hardware_ci/run-xpu-batch-invariance.sh
       plugins:
       - kubernetes: *k8s-2gpu
-    - label: V1 Core + KV + Metrics
+    - label: ":intel: (BMG) V1 Core + KV + Metrics"
       key: v1-core-kv-metrics-intel
       timeout_in_minutes: 45
       agents:
@@ -199,7 +199,7 @@ steps:
       - VLLM_BATCH_INVARIANT=1 pytest -v -s -m "not cpu_test" v1/ec_connector/unit --ignore=v1/ec_connector/unit/test_ec_cpu_connector.py
       plugins:
       - kubernetes: *k8s-1gpu
-    - label: EC CPU Connector (XPU)
+    - label: ":intel: (BMG) EC CPU Connector (XPU)"
       key: ec-cpu-connector-xpu
       timeout_in_minutes: 45
       agents:
@@ -223,7 +223,7 @@ steps:
       - pytest -v -s v1/ec_connector/unit/test_ec_cpu_connector.py
       plugins:
       - kubernetes: *k8s-1gpu
-    - label: V1 Sample + Logits
+    - label: ":intel: (BMG) V1 Sample + Logits"
       key: v1-sample-logits-intel
       timeout_in_minutes: 90
       agents:
@@ -261,7 +261,7 @@ steps:
       - pytest -v -s v1/sample
       plugins:
       - kubernetes: *k8s-1gpu
-    - label: Basic Models Tests (Initialization)
+    - label: ":intel: (BMG) Basic Models Tests (Initialization)"
       key: basic-models-tests-initialization
       timeout_in_minutes: 60
       agents:
@@ -278,7 +278,7 @@ steps:
       - pytest -v -s models/test_initialization.py::test_can_initialize_large_subset[Eagle3MiniMaxM2ForCausalLM]
       plugins:
       - kubernetes: *k8s-1gpu
-    - label: XPU CPU Offload
+    - label: ":intel: (BMG) CPU Offload"
       key: xpu-cpu-offload
       timeout_in_minutes: 60
       agents:
@@ -298,7 +298,7 @@ steps:
       - pytest -v -s v1/kv_connector/unit/test_offloading_connector.py
       plugins:
       - kubernetes: *k8s-1gpu
-    - label: NixlConnector PD accuracy (4 GPUs)
+    - label: ":intel: (BMG) NixlConnector PD accuracy (4 GPUs)"
       key: nixlconnector-pd-accuracy-4-gpus
       timeout_in_minutes: 60
       agents:
@@ -321,7 +321,7 @@ steps:
       - PREFILLER_TP_SIZE=2 DECODER_TP_SIZE=2 bash v1/kv_connector/nixl_integration/run_xpu_disagg_accuracy_test.sh
       plugins:
       - kubernetes: *k8s-4gpu
-    - label: Regression
+    - label: ":intel: (BMG) Regression"
       key: regression
       timeout_in_minutes: 50
       agents:
@@ -346,7 +346,7 @@ steps:
       - pytest -v -s test_regression.py
       plugins:
       - kubernetes: *k8s-1gpu
-    - label: Metrics, Tracing (2 GPUs)
+    - label: ":intel: (BMG) Metrics, Tracing (2 GPUs)"
       key: metrics-tracing-2-gpus
       timeout_in_minutes: 45
       agents:
@@ -372,7 +372,7 @@ steps:
       - pytest -v -s v1/tracing
       plugins:
       - kubernetes: *k8s-2gpu
-    - label: Async Engine, Inputs, Utils, Worker
+    - label: ":intel: (BMG) Async Engine, Inputs, Utils, Worker"
       key: async-engine-inputs-utils-worker
       timeout_in_minutes: 55
       agents:
@@ -403,7 +403,7 @@ steps:
       - pytest -v -s utils_ --ignore=utils_/test_mem_utils.py
       plugins:
       - kubernetes: *k8s-1gpu
-    - label: Detokenizer Stop Strings (XPU)
+    - label: ":intel: (BMG) Detokenizer Stop Strings (XPU)"
       key: detokenizer-stop-strings-xpu
       timeout_in_minutes: 45
       agents:
@@ -432,7 +432,7 @@ steps:
       - pytest -v -s detokenizer/test_stop_strings.py
       plugins:
       - kubernetes: *k8s-1gpu
-    - label: Fusion Unit Tests
+    - label: ":intel: (BMG) Fusion Unit Tests"
       key: fusion-unit-tests
       timeout_in_minutes: 30
       agents:

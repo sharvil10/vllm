@@ -66,10 +66,10 @@
           type: DirectoryOrCreate
 
 steps:
-  - group: Benchmarks
+  - group: Benchmarks Intel
     key: benchmarks-intel
     steps:
-    - label: Benchmarks CLI Test
+    - label: ":intel: (BMG) Benchmarks CLI"
       key: benchmarks-cli-test
       timeout_in_minutes: 40
       agents:

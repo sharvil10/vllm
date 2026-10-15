@@ -128,7 +128,7 @@ steps:
   - group: Engine Intel
     key: engine-intel
     steps:
-    - label: "Engine"
+    - label: ":intel: (BMG) Engine"
       key: engine
       timeout_in_minutes: 40
       agents:
@@ -158,7 +158,7 @@ steps:
       plugins:
         - kubernetes: *k8s-1gpu
 
-    - label: "Engine (1 GPU)"
+    - label: ":intel: (BMG) Engine (1 GPU)"
       key: engine-1-gpu
       timeout_in_minutes: 30
       agents:
@@ -175,7 +175,7 @@ steps:
       plugins:
         - kubernetes: *k8s-1gpu
 
-    - label: "V1 e2e (2 GPUs)"
+    - label: ":intel: (BMG) V1 e2e (2 GPUs)"
       key: v1-e2e-2-gpus
       timeout_in_minutes: 30
       agents:

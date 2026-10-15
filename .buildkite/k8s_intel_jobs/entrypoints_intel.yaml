@@ -68,7 +68,7 @@
           type: DirectoryOrCreate
 
 steps:
-  - group: Entrypoints
+  - group: Entrypoints Intel
     key: entrypoints-intel
     steps:
     - label: ":intel: (BMG) Entrypoints Unit"

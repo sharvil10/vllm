@@ -103,7 +103,7 @@ steps:
   - group: LoRA Intel
     key: lora-intel
     steps:
-    - label: "LoRA Runtime + Utils"
+    - label: ":intel: (BMG) LoRA Runtime + Utils"
       key: lora-runtime-utils
       timeout_in_minutes: 45
       agents:
@@ -128,7 +128,7 @@ steps:
       plugins:
         - kubernetes: *k8s-1gpu
 
-    - label: "LoRA Fused/MoE Kernels"
+    - label: ":intel: (BMG) LoRA Fused/MoE Kernels"
       key: lora-fused-moe-kernels
       timeout_in_minutes: 45
       agents:
@@ -145,7 +145,7 @@ steps:
       plugins:
         - kubernetes: *k8s-1gpu
 
-    - label: "LoRA Punica Kernels"
+    - label: ":intel: (BMG) LoRA Punica Kernels"
       key: lora-punica-kernels
       timeout_in_minutes: 45
       agents:
@@ -163,7 +163,7 @@ steps:
       plugins:
         - kubernetes: *k8s-1gpu
 
-    - label: "LoRA Punica FP8/XPU Ops"
+    - label: ":intel: (BMG) LoRA Punica FP8/XPU Ops"
       key: lora-punica-fp8-xpu-ops
       timeout_in_minutes: 60
       agents:
@@ -180,7 +180,7 @@ steps:
       plugins:
         - kubernetes: *k8s-1gpu
 
-    - label: "LoRA Models"
+    - label: ":intel: (BMG) LoRA Models"
       key: lora-models
       timeout_in_minutes: 45
       agents:
@@ -199,7 +199,7 @@ steps:
       plugins:
         - kubernetes: *k8s-2gpu
 
-    - label: "LoRA Multimodal"
+    - label: ":intel: (BMG) LoRA Multimodal"
       key: lora-multimodal
       timeout_in_minutes: 45
       agents:
@@ -215,7 +215,7 @@ steps:
       plugins:
         - kubernetes: *k8s-1gpu
 
-    - label: "LoRA Add + Multimodal"
+    - label: ":intel: (BMG) LoRA Add + Multimodal"
       key: lora-add-multimodal
       timeout_in_minutes: 45
       agents:

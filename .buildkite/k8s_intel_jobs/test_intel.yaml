@@ -118,7 +118,7 @@ steps:
   - group: Intel
     key: test-intel
     steps:
-    - label: XPU example Test
+    - label: ":intel: (BMG) Example Test"
       key: xpu-example-test
       timeout_in_minutes: 70
       agents:
@@ -144,7 +144,7 @@ steps:
       - python3 examples/basic/offline_inference/generate.py --model INCModel/Qwen3-30B-A3B-Instruct-2507-MXFP4-LLMC -tp 2 --max-model-len 8192
       plugins:
       - kubernetes: *k8s-2gpu
-    - label: XPU W8A8 FP8 Linear Examples
+    - label: ":intel: (BMG) W8A8 FP8 Linear Examples"
       key: xpu-w8a8-fp8-linear-examples
       timeout_in_minutes: 60
       agents:
@@ -163,7 +163,7 @@ steps:
       - python3 examples/basic/offline_inference/generate.py --linear-backend torch --model meta-llama/Llama-3.2-1B-Instruct --quantization fp8_per_tensor --enforce-eager --max-model-len 4096
       plugins:
       - kubernetes: *k8s-1gpu
-    - label: XPU V1 test
+    - label: ":intel: (BMG) V1 test"
       key: xpu-v1-test
       timeout_in_minutes: 70
       agents:
@@ -189,7 +189,7 @@ steps:
       - pytest -v -s v1/kv_connector/unit --ignore=v1/kv_connector/unit/test_lmcache_integration.py --ignore=v1/kv_connector/unit/test_hf3fs_client.py --ignore=v1/kv_connector/unit/test_hf3fs_connector.py --ignore=v1/kv_connector/unit/test_hf3fs_metadata_server.py --ignore=v1/kv_connector/unit/test_offloading_connector.py --ignore=v1/kv_connector/unit/test_multi_connector.py --ignore=v1/kv_connector/unit/test_example_connector.py --deselect=tests/v1/kv_connector/unit/test_nixl_connector.py::test_abort_timeout_on_prefiller[ray]
       plugins:
       - kubernetes: *k8s-1gpu
-    - label: XPU Qwen3-30B + V1 KV Connector
+    - label: ":intel: (BMG) Qwen3-30B + V1 KV Connector"
       key: xpu-qwen3-30b-v1-kv-connector
       timeout_in_minutes: 90
       agents:
@@ -208,7 +208,7 @@ steps:
       - VLLM_XPU_FUSED_MOE_USE_REF=1 python3 examples/basic/offline_inference/generate.py --model Qwen/Qwen3-30B-A3B-Instruct-2507-FP8 --enforce-eager -tp 2 --max-model-len 8192
       plugins:
       - kubernetes: *k8s-2gpu
-    - label: XPU server test
+    - label: ":intel: (BMG) Server test"
       key: xpu-server-test
       timeout_in_minutes: 45
       agents:
@@ -224,7 +224,7 @@ steps:
       - pytest -v -s benchmarks/test_serve_cli.py
       plugins:
       - kubernetes: *k8s-1gpu
-    - label: XPU quantization test
+    - label: ":intel: (BMG) Quantization test"
       key: xpu-quantization-test
       timeout_in_minutes: 30
       agents:
@@ -240,7 +240,7 @@ steps:
       - pytest -v -s quantization/test_online.py --deselect=tests/quantization/test_online.py::test_online_quantization_loads_real_weights --deselect="tests/quantization/test_online.py::test_online_quantization[False-requantization_mxfp8_ptcp_fp8]"
       plugins:
       - kubernetes: *k8s-1gpu
-    - label: XPU compressed tensors FP8 test
+    - label: ":intel: (BMG) Compressed tensors FP8 test"
       key: xpu-compressed-tensors-fp8-test
       timeout_in_minutes: 60
       agents:
@@ -257,7 +257,7 @@ steps:
       - pytest -v -s quantization/test_compressed_tensors.py::test_compressed_tensors_fp8_block_enabled
       plugins:
       - kubernetes: *k8s-1gpu
-    - label: XPU Graph
+    - label: ":intel: (BMG) Graph"
       key: xpu-graph
       timeout_in_minutes: 60
       agents:
