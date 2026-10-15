@@ -1,7 +1,7 @@
 # Kubernetes-native port of .buildkite/intel_jobs/engine_intel.yaml.
 #
 # Same tests and timeouts as upstream; runner differences (image, DRA GPUs,
-# Kueue, copy-vllm-src init container, explicit cd) are described in
+# copy-vllm-src init container, explicit cd) are described in
 # kernels_intel.yaml and README.md.
 
 .env: &env
@@ -13,10 +13,6 @@
 .k8s-1gpu: &k8s-1gpu
   checkout:
     skip: true
-  metadata:
-    labels:
-      kueue.x-k8s.io/queue-name: ci-b70
-      kueue.x-k8s.io/priority-class: priority-normal
   podSpec:
     resourceClaims:
       - name: gpu
@@ -70,10 +66,6 @@
 .k8s-2gpu: &k8s-2gpu
   checkout:
     skip: true
-  metadata:
-    labels:
-      kueue.x-k8s.io/queue-name: ci-b70
-      kueue.x-k8s.io/priority-class: priority-normal
   podSpec:
     resourceClaims:
       - name: gpu
