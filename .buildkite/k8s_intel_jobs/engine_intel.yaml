@@ -132,7 +132,7 @@ steps:
       key: engine
       timeout_in_minutes: 40
       agents:
-        queue: intel-b70
+        queue: intel-gpu-k8s
       env: *env
       source_file_dependencies:
         - vllm/compilation/
@@ -162,7 +162,7 @@ steps:
       key: engine-1-gpu
       timeout_in_minutes: 30
       agents:
-        queue: intel-b70
+        queue: intel-gpu-k8s
       env: *env
       source_file_dependencies:
         - vllm/v1/engine/
@@ -179,7 +179,7 @@ steps:
       key: v1-e2e-2-gpus
       timeout_in_minutes: 30
       agents:
-        queue: intel-b70
+        queue: intel-gpu-k8s
       env: *env
       source_file_dependencies:
         - vllm/compilation/

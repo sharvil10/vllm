@@ -132,7 +132,7 @@ steps:
       key: xpu-gpqa-eval-gpt-oss
       timeout_in_minutes: 60
       agents:
-        queue: intel-b70
+        queue: intel-gpu-k8s
       env: *env
       source_file_dependencies:
         - csrc/
@@ -148,7 +148,7 @@ steps:
       key: lm-eval-large-models-2-gpus
       timeout_in_minutes: 45
       agents:
-        queue: intel-b70
+        queue: intel-gpu-k8s
       env: *env
       optional: true
       source_file_dependencies:

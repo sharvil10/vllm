@@ -107,7 +107,7 @@ steps:
       key: lora-runtime-utils
       timeout_in_minutes: 45
       agents:
-        queue: intel-b70
+        queue: intel-gpu-k8s
       env: *env
       source_file_dependencies:
         - vllm/lora
@@ -132,7 +132,7 @@ steps:
       key: lora-fused-moe-kernels
       timeout_in_minutes: 45
       agents:
-        queue: intel-b70
+        queue: intel-gpu-k8s
       env: *env
       source_file_dependencies:
         - vllm/lora
@@ -149,7 +149,7 @@ steps:
       key: lora-punica-kernels
       timeout_in_minutes: 45
       agents:
-        queue: intel-b70
+        queue: intel-gpu-k8s
       env: *env
       source_file_dependencies:
         - vllm/lora
@@ -167,7 +167,7 @@ steps:
       key: lora-punica-fp8-xpu-ops
       timeout_in_minutes: 60
       agents:
-        queue: intel-b70
+        queue: intel-gpu-k8s
       env: *env
       source_file_dependencies:
         - vllm/lora
@@ -184,7 +184,7 @@ steps:
       key: lora-models
       timeout_in_minutes: 45
       agents:
-        queue: intel-b70
+        queue: intel-gpu-k8s
       env: *env
       source_file_dependencies:
         - vllm/lora
@@ -203,7 +203,7 @@ steps:
       key: lora-multimodal
       timeout_in_minutes: 45
       agents:
-        queue: intel-b70
+        queue: intel-gpu-k8s
       env: *env
       source_file_dependencies:
         - vllm/lora
@@ -219,7 +219,7 @@ steps:
       key: lora-add-multimodal
       timeout_in_minutes: 45
       agents:
-        queue: intel-b70
+        queue: intel-gpu-k8s
       env: *env
       source_file_dependencies:
         - vllm/lora

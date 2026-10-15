@@ -107,7 +107,7 @@ steps:
       key: multi-modal-models-standard-1-qwen2
       timeout_in_minutes: 70
       agents:
-        queue: intel-b70
+        queue: intel-gpu-k8s
       env: *env
       source_file_dependencies:
         - vllm/
@@ -123,7 +123,7 @@ steps:
       key: multi-modal-models-standard-2-qwen3-gemma
       timeout_in_minutes: 90
       agents:
-        queue: intel-b70
+        queue: intel-gpu-k8s
       env: *env
       source_file_dependencies:
         - vllm/
@@ -140,7 +140,7 @@ steps:
       key: multi-modal-models-standard-3-llava-qwen2-vl
       timeout_in_minutes: 65
       agents:
-        queue: intel-b70
+        queue: intel-gpu-k8s
       env: *env
       source_file_dependencies:
         - vllm/
@@ -157,7 +157,7 @@ steps:
       key: multi-modal-models-standard-4-other-whisper
       timeout_in_minutes: 45
       agents:
-        queue: intel-b70
+        queue: intel-gpu-k8s
       env: *env
       source_file_dependencies:
         - vllm/
@@ -173,7 +173,7 @@ steps:
       timeout_in_minutes: 60
       parallelism: 4
       agents:
-        queue: intel-b70
+        queue: intel-gpu-k8s
       env: *env
       source_file_dependencies:
         - vllm/
@@ -189,7 +189,7 @@ steps:
       key: multi-modal-models-extended-generation-1
       timeout_in_minutes: 60
       agents:
-        queue: intel-b70
+        queue: intel-gpu-k8s
       env: *env
       optional: true
       source_file_dependencies:

@@ -73,7 +73,7 @@ steps:
       key: distributed-model-tests-2-gpus
       timeout_in_minutes: 65
       agents:
-        queue: intel-b70
+        queue: intel-gpu-k8s
       env: *env
       source_file_dependencies:
         - vllm/model_executor/model_loader/sharded_state_loader.py

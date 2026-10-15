@@ -75,7 +75,7 @@ steps:
       key: model-executor-intel
       timeout_in_minutes: 45
       agents:
-        queue: intel-b70
+        queue: intel-gpu-k8s
       env: *env
       source_file_dependencies:
         - vllm/engine/arg_utils.py
@@ -95,7 +95,7 @@ steps:
       key: tensorizer-model-loader-tests-xpu
       timeout_in_minutes: 45
       agents:
-        queue: intel-b70
+        queue: intel-gpu-k8s
       env: *env
       source_file_dependencies:
         - vllm/engine/arg_utils.py

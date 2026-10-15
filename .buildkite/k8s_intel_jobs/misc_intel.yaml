@@ -159,7 +159,7 @@ steps:
       key: xpu-batch-invariance
       timeout_in_minutes: 60
       agents:
-        queue: intel-b70
+        queue: intel-gpu-k8s
       env: *env
       source_file_dependencies:
         - vllm/
@@ -178,7 +178,7 @@ steps:
       key: v1-core-kv-metrics-intel
       timeout_in_minutes: 45
       agents:
-        queue: intel-b70
+        queue: intel-gpu-k8s
       env: *env
       source_file_dependencies:
         - vllm/
@@ -203,7 +203,7 @@ steps:
       key: ec-cpu-connector-xpu
       timeout_in_minutes: 45
       agents:
-        queue: intel-b70
+        queue: intel-gpu-k8s
       env: *env
       source_file_dependencies:
         - vllm/
@@ -227,7 +227,7 @@ steps:
       key: v1-sample-logits-intel
       timeout_in_minutes: 90
       agents:
-        queue: intel-b70
+        queue: intel-gpu-k8s
       env: *env
       parallelism: 4
       retry:
@@ -265,7 +265,7 @@ steps:
       key: basic-models-tests-initialization
       timeout_in_minutes: 60
       agents:
-        queue: intel-b70
+        queue: intel-gpu-k8s
       env: *env
       source_file_dependencies:
         - vllm/
@@ -282,7 +282,7 @@ steps:
       key: xpu-cpu-offload
       timeout_in_minutes: 60
       agents:
-        queue: intel-b70
+        queue: intel-gpu-k8s
       env: *env
       source_file_dependencies:
         - vllm/
@@ -302,7 +302,7 @@ steps:
       key: nixlconnector-pd-accuracy-4-gpus
       timeout_in_minutes: 60
       agents:
-        queue: intel-b70
+        queue: intel-gpu-k8s
       env:
         <<: *env
         # TP>=4 hangs after xCCL init on the PCIe-only B70s without this.
@@ -325,7 +325,7 @@ steps:
       key: regression
       timeout_in_minutes: 50
       agents:
-        queue: intel-b70
+        queue: intel-gpu-k8s
       env: *env
       source_file_dependencies:
         - vllm/config/
@@ -350,7 +350,7 @@ steps:
       key: metrics-tracing-2-gpus
       timeout_in_minutes: 45
       agents:
-        queue: intel-b70
+        queue: intel-gpu-k8s
       env: *env
       source_file_dependencies:
         - vllm/config/
@@ -376,7 +376,7 @@ steps:
       key: async-engine-inputs-utils-worker
       timeout_in_minutes: 55
       agents:
-        queue: intel-b70
+        queue: intel-gpu-k8s
       env: *env
       source_file_dependencies:
         - vllm/assets/
@@ -407,7 +407,7 @@ steps:
       key: detokenizer-stop-strings-xpu
       timeout_in_minutes: 45
       agents:
-        queue: intel-b70
+        queue: intel-gpu-k8s
       env: *env
       source_file_dependencies:
         - vllm/assets/
@@ -436,7 +436,7 @@ steps:
       key: fusion-unit-tests
       timeout_in_minutes: 30
       agents:
-        queue: intel-b70
+        queue: intel-gpu-k8s
       env: *env
       source_file_dependencies:
         - vllm/compilation/

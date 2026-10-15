@@ -7,7 +7,11 @@ side.
 
 - Buildkite pipeline: https://buildkite.com/sharvil-shah/vllm-intel-k8s
   (branches `k8s-ci`, `k8s-ci-*`; agent-stack-k8s controller on queue
-  `intel-b70`, namespace `vllm-ci`).
+  `intel-gpu-k8s`, namespace `vllm-ci`).
+- The queue doesn't name a GPU. Each step picks its GPU model and count
+  through its DRA ResourceClaimTemplate (`b70-N` selects `model == "B70"`;
+  templates live in vllm-ci-fluxCD), so every step uses
+  `agents: {queue: intel-gpu-k8s}`.
 - `upload.sh` resolves the image (`VLLM_COMMIT`, `VLLM_IMAGE_MIRROR`) and
   uploads every `*_intel.yaml` here, or only the space-separated file names
   in build env `K8S_INTEL_JOBS`.
@@ -54,7 +58,7 @@ verbatim, then for each upstream step:
 | --- | --- |
 | `group: X` + top-level `steps:` | `steps: [ {group: X, key: <file-stem>, steps: [...]} ]` (`pipeline upload` needs `steps:` at the top) |
 | `depends_on: image-build-xpu`, `device`, `no_plugin`, `working_dir`, `agent_tags` | drop them |
-| `agent_tags.gpu: N+` | anchor `.k8s-Ngpu` using `resourceClaimTemplateName: b70-N` (templates exist for 1/2/4/8) |
+| `agent_tags.gpu: N+` | `agents: {queue: intel-gpu-k8s}` plus anchor `.k8s-Ngpu` using `resourceClaimTemplateName: b70-N` (templates exist for 1/2/4/8) |
 | `env: REGISTRY/REPO/VLLM_TEST_DEVICE` | `env: *env` (merge extra step env with `<<: *env`) |
 | `timeout_in_minutes`, `label`, `key`, `parallelism`, `soft_fail`, `retry` | keep as-is |
 | `optional`, `source_file_dependencies` | keep as-is (quote `"!..."` exclusions); `select_steps.py` applies and strips them at upload |

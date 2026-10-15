@@ -73,7 +73,7 @@ steps:
       key: benchmarks-cli-test
       timeout_in_minutes: 40
       agents:
-        queue: intel-b70
+        queue: intel-gpu-k8s
       env: *env
       source_file_dependencies:
         - vllm/

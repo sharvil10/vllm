@@ -73,7 +73,7 @@ steps:
       key: quantization
       timeout_in_minutes: 30
       agents:
-        queue: intel-b70
+        queue: intel-gpu-k8s
       env: *env
       source_file_dependencies:
         - csrc/

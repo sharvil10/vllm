@@ -75,7 +75,7 @@ steps:
       key: entrypoints-unit-tests-intel
       timeout_in_minutes: 45
       agents:
-        queue: intel-b70
+        queue: intel-gpu-k8s
       env: *env
       source_file_dependencies:
         - vllm/entrypoints
@@ -93,7 +93,7 @@ steps:
       key: entrypoints-integration-llm-intel
       timeout_in_minutes: 70
       agents:
-        queue: intel-b70
+        queue: intel-gpu-k8s
       env: *env
       source_file_dependencies:
         - vllm/
@@ -110,7 +110,7 @@ steps:
       key: entrypoints-integration-api-server-intel
       timeout_in_minutes: 70
       agents:
-        queue: intel-b70
+        queue: intel-gpu-k8s
       env: *env
       source_file_dependencies:
         - vllm/
@@ -131,7 +131,7 @@ steps:
       key: entrypoints-integration-api-server-scale-out-intel
       timeout_in_minutes: 40
       agents:
-        queue: intel-b70
+        queue: intel-gpu-k8s
       env: *env
       source_file_dependencies:
         - vllm/
@@ -148,7 +148,7 @@ steps:
       key: entrypoints-integration-api-server-generate-intel
       timeout_in_minutes: 65
       agents:
-        queue: intel-b70
+        queue: intel-gpu-k8s
       env: *env
       optional: true
       source_file_dependencies:
@@ -174,7 +174,7 @@ steps:
       key: entrypoints-integration-responses-api-intel
       timeout_in_minutes: 60
       agents:
-        queue: intel-b70
+        queue: intel-gpu-k8s
       env: *env
       optional: true
       source_file_dependencies:
@@ -191,7 +191,7 @@ steps:
       key: openai-api-correctness-intel
       timeout_in_minutes: 30
       agents:
-        queue: intel-b70
+        queue: intel-gpu-k8s
       env: *env
       source_file_dependencies:
         - csrc/

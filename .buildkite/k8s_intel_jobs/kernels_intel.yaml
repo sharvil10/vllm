@@ -94,7 +94,7 @@ steps:
       key: vllm-ir-tests
       timeout_in_minutes: 30
       agents:
-        queue: intel-b70
+        queue: intel-gpu-k8s
       env: *env
       source_file_dependencies:
         - vllm/ir
@@ -110,7 +110,7 @@ steps:
       key: uva-kernel-tests
       timeout_in_minutes: 20
       agents:
-        queue: intel-b70
+        queue: intel-gpu-k8s
       env: *env
       source_file_dependencies:
         - tests/kernels/core/test_uva.py

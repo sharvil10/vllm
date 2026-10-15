@@ -73,7 +73,7 @@ steps:
       key: eplb-algorithm
       timeout_in_minutes: 45
       agents:
-        queue: intel-b70
+        queue: intel-gpu-k8s
       env: *env
       source_file_dependencies:
         - vllm/distributed/eplb

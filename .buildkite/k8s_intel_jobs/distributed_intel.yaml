@@ -75,7 +75,7 @@ steps:
       key: distributed-torchrun-shutdown-tests-2-gpus
       timeout_in_minutes: 50
       agents:
-        queue: intel-b70
+        queue: intel-gpu-k8s
       env: *env
       source_file_dependencies:
         - vllm/distributed/

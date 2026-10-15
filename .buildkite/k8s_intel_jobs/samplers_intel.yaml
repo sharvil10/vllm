@@ -75,7 +75,7 @@ steps:
       key: samplers-test-xpu-kernel-intel
       timeout_in_minutes: 40
       agents:
-        queue: intel-b70
+        queue: intel-gpu-k8s
       env: *env
       source_file_dependencies:
         - vllm/model_executor/layers
@@ -93,7 +93,7 @@ steps:
       key: samplers-beam-search-test-xpu-kernel-intel
       timeout_in_minutes: 40
       agents:
-        queue: intel-b70
+        queue: intel-gpu-k8s
       env: *env
       source_file_dependencies:
         - vllm/model_executor/layers
